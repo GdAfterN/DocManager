@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.javaee.docai.doc.mapper.DocumentMapper">
+
+    <insert id="insert" parameterType="com.javaee.docai.doc.entity.Document" useGeneratedKeys="false">
+        INSERT INTO document (id, title, content, summary, keywords, file_id, user_id, status, version, category, tags, created_by, create_time, update_time)
+        VALUES (#{id}, #{title}, #{content}, #{summary}, #{keywords}, #{fileId}, #{userId}, #{status}, #{version}, #{category}, #{tags}, #{createdBy}, #{createTime}, #{updateTime})
+    </insert>
+
+    <select id="selectById" resultType="com.javaee.docai.doc.entity.Document">
+        SELECT * FROM document WHERE id = #{id}
+    </select>
+
+    <update id="updateById" parameterType="com.javaee.docai.doc.entity.Document">
+        UPDATE document
+        SET title = #{title}, summary = #{summary}, keywords = #{keywords}, status = #{status},
+            version = #{version}, category = #{category}, tags = #{tags}, update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM document WHERE id = #{id}
+    </delete>
+
+    <select id="selectByUserId" resultType="com.javaee.docai.doc.entity.Document">
+        SELECT * FROM document WHERE user_id = #{userId} AND status = 'active' ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByCategory" resultType="com.javaee.docai.doc.entity.Document">
+        SELECT * FROM document WHERE category = #{category} AND status = 'active' ORDER BY create_time DESC
+    </select>
+
+    <select id="searchByKeyword" resultType="com.javaee.docai.doc.entity.Document">
+        SELECT * FROM document
+        WHERE (title LIKE CONCAT('%', #{keyword}, '%')
+            OR keywords LIKE CONCAT('%', #{keyword}, '%'))
+          AND status = 'active'
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByStatus" resultType="com.javaee.docai.doc.entity.Document">
+        SELECT * FROM document WHERE status = #{status} ORDER BY create_time DESC
+    </select>
+
+</mapper>

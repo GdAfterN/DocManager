@@ -1,0 +1,69 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: docai
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/doc_ai?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: your_mysql_password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: your_redis_password
+      database: 0
+      timeout: 10000
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 1024MB
+      max-request-size: 1024MB
+
+  main:
+    allow-bean-definition-overriding: true
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.javaee.docai.user.entity,com.javaee.docai.file.entity,com.javaee.docai.doc.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+minio:
+  endpoint: http://localhost:9000
+  access-key: your_minio_access_key
+  secret-key: your_minio_secret_key
+  bucket-name: doc-ai
+  secure: false
+
+file:
+  storage:
+    type: minio
+    local-path: /data/file-storage
+    max-size: 1024
+
+ai:
+  anthropic:
+    api-key: your_api_key
+    base-url: https://your-api-endpoint.com/anthropic
+    chat:
+      model: claude-sonnet-4-20250514
+    max-tokens: 4096
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.javaee.docai: debug

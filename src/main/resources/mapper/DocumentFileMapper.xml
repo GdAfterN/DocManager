@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.javaee.docai.doc.mapper.DocumentFileMapper">
+
+    <insert id="insert" parameterType="com.javaee.docai.doc.entity.DocumentFile" useGeneratedKeys="false">
+        INSERT INTO document_file (id, title, current_file_id, current_version, file_type, status, create_by, create_time, update_time)
+        VALUES (#{id}, #{title}, #{currentFileId}, #{currentVersion}, #{fileType}, #{status}, #{createBy}, #{createTime}, #{updateTime})
+    </insert>
+
+    <select id="selectById" resultType="com.javaee.docai.doc.entity.DocumentFile">
+        SELECT * FROM document_file WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultType="com.javaee.docai.doc.entity.DocumentFile">
+        SELECT * FROM document_file WHERE status = 'active' ORDER BY update_time DESC
+    </select>
+
+    <update id="updateCurrentFile">
+        UPDATE document_file
+        SET current_file_id = #{fileId}, current_version = #{version}, update_time = #{updateTime}
+        WHERE id = #{id}
+    </update>
+
+    <update id="deleteById">
+        UPDATE document_file SET status = 'deleted' WHERE id = #{id}
+    </update>
+
+</mapper>

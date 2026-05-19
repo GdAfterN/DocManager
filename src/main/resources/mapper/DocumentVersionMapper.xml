@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.javaee.docai.doc.mapper.DocumentVersionMapper">
+
+    <insert id="insert" parameterType="com.javaee.docai.doc.entity.DocumentVersion" useGeneratedKeys="false">
+        INSERT INTO document_version (id, document_id, version_number, title, content, summary, keywords, change_log, created_by, create_time)
+        VALUES (#{id}, #{documentId}, #{versionNumber}, #{title}, #{content}, #{summary}, #{keywords}, #{changeLog}, #{createdBy}, #{createTime})
+    </insert>
+
+    <select id="selectByDocumentId" resultType="com.javaee.docai.doc.entity.DocumentVersion">
+        SELECT * FROM document_version WHERE document_id = #{documentId} ORDER BY version_number DESC
+    </select>
+
+    <select id="selectLatestVersion" resultType="com.javaee.docai.doc.entity.DocumentVersion">
+        SELECT * FROM document_version
+        WHERE document_id = #{documentId}
+        ORDER BY version_number DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectMaxVersionNumber" resultType="java.lang.Integer">
+        SELECT COALESCE(MAX(version_number), 0) FROM document_version WHERE document_id = #{documentId}
+    </select>
+
+    <select id="selectByDocumentIdAndVersion" resultType="com.javaee.docai.doc.entity.DocumentVersion">
+        SELECT * FROM document_version
+        WHERE document_id = #{documentId} AND version_number = #{versionNumber}
+        LIMIT 1
+    </select>
+
+</mapper>
