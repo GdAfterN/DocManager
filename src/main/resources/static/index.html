@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DocAI - 智能文档管理平台</title>
+    <title>DocManager - 智能文档管理平台</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
     <style>
@@ -43,7 +43,7 @@
         .app-layout { display: flex; min-height: 100vh; }
         .sidebar { width: 220px; background: #1e293b; color: #fff; padding: 0; flex-shrink: 0; position: fixed; top: 0; left: 0; bottom: 0; overflow-y: auto; z-index: 100; }
         .sidebar-header { padding: 20px; font-size: 20px; font-weight: 700; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 10px; }
-        .sidebar-header .logo { width: 32px; height: 32px; background: #667eea; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .sidebar-header .logo { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
         .nav-section { padding: 12px 0; }
         .nav-section-title { padding: 8px 20px; font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 1px; }
         .nav-item { padding: 10px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; transition: all 0.15s; color: #94a3b8; }
@@ -93,15 +93,24 @@
 
         /* Chat */
         .chat-container { display: flex; flex-direction: column; height: calc(100vh - 180px); }
-        .chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: #f8fafc; border-radius: 8px; margin-bottom: 16px; }
+        .chat-messages { flex: 2; overflow-y: auto; padding: 16px; background: #f8fafc; border-radius: 8px; margin-bottom: 10px; min-height: 0; }
         .chat-msg { margin-bottom: 12px; display: flex; }
         .chat-msg.user { justify-content: flex-end; }
         .chat-msg .bubble { max-width: 70%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; }
         .chat-msg.user .bubble { background: #667eea; color: #fff; border-bottom-right-radius: 4px; }
         .chat-msg.assistant .bubble { background: #fff; color: #333; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
-        .chat-input { display: flex; gap: 12px; }
-        .chat-input input { flex: 1; padding: 12px 16px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
-        .chat-input input:focus { outline: none; border-color: #667eea; }
+        .chat-input { position: relative; flex: 1; display: flex; flex-direction: column; }
+        .chat-input textarea { width: 100%; flex: 1; padding: 14px 16px; padding-bottom: 50px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; resize: none; line-height: 1.6; font-family: inherit; box-sizing: border-box; background: #f0f0f0; }
+        .chat-input textarea:focus { outline: none; border-color: #667eea; }
+        .chat-input .btn-send { position: absolute; bottom: 12px; right: 12px; width: 40px; height: 40px; border-radius: 50%; border: none; background: #667eea; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+        .chat-input .btn-send:hover { background: #5a6fd6; }
+        .chat-input .btn-send:disabled { background: #a0aec0; cursor: not-allowed; }
+
+        /* Drag handle for resizing chat split */
+        .drag-handle { height: 8px; flex-shrink: 0; cursor: ns-resize; position: relative; user-select: none; display: flex; align-items: center; justify-content: center; }
+        .drag-handle::after { content: ''; width: 40px; height: 4px; border-radius: 2px; background: #d1d5db; transition: background 0.15s; }
+        .drag-handle:hover::after, .drag-handle.dragging::after { background: #667eea; }
+        .drag-handle.dragging { background: rgba(102,126,234,0.05); }
 
         /* Upload */
         .upload-zone { border: 2px dashed #ddd; border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; }
@@ -166,7 +175,8 @@
     <!-- Login / Register Page -->
     <div v-if="!token" class="login-container">
         <div class="login-box">
-            <h1>DocAI</h1>
+            <img src="/梅宝举猪图_1_ノ8し_来自小红书网页版.jpg" alt="DocManager" style="width:80px;height:80px;border-radius:50%;object-fit:cover;margin:0 auto 12px;display:block;">
+            <h1>DocManager</h1>
             <p class="subtitle">智能文档管理平台</p>
 
             <div v-if="authMode === 'login'">
@@ -212,8 +222,8 @@
         <!-- Sidebar -->
         <div class="sidebar">
             <div class="sidebar-header">
-                <div class="logo">D</div>
-                DocAI
+                <img class="logo" src="/梅宝举猪图_1_ノ8し_来自小红书网页版.jpg" alt="DocManager">
+                DocManager
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">概览</div>
@@ -235,44 +245,17 @@
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">AI 功能</div>
-                <div :class="['nav-item', currentPage==='ai-summarize' && 'active']" @click="goTo('ai-summarize')">
-                    <span class="icon">&#9998;</span> 文本摘要
-                </div>
-                <div :class="['nav-item', currentPage==='ai-keywords' && 'active']" @click="goTo('ai-keywords')">
-                    <span class="icon">&#128270;</span> 关键词提取
-                </div>
-                <div :class="['nav-item', currentPage==='ai-analyze' && 'active']" @click="goTo('ai-analyze')">
-                    <span class="icon">&#128202;</span> 文本分析
-                </div>
-            </div>
-            <div class="nav-section">
-                <div class="nav-section-title">知识库</div>
                 <div :class="['nav-item', currentPage==='rag' && 'active']" @click="goTo('rag')">
-                    <span class="icon">&#128218;</span> RAG 问答
+                    <span class="icon">&#128218;</span> 知识库问答
                 </div>
-                <div :class="['nav-item', currentPage==='rag-manage' && 'active']" @click="goTo('rag-manage')">
-                    <span class="icon">&#9881;</span> 索引管理
-                </div>
-            </div>
-            <div class="nav-section">
-                <div class="nav-section-title">Agent</div>
-                <div :class="['nav-item', currentPage==='agent-chat' && 'active']" @click="goTo('agent-chat')">
-                    <span class="icon">&#128172;</span> Agent 对话
-                </div>
-                <div :class="['nav-item', currentPage==='plan-execute' && 'active']" @click="goTo('plan-execute')">
-                    <span class="icon">&#9889;</span> 计划执行
+                <div :class="['nav-item', currentPage==='ai-chat' && 'active']" @click="goTo('ai-chat')">
+                    <span class="icon">&#128172;</span> PPT 生成
                 </div>
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">运维监控</div>
                 <div :class="['nav-item', currentPage==='aiops' && 'active']" @click="goTo('aiops')">
                     <span class="icon">&#128200;</span> 系统监控
-                </div>
-                <div :class="['nav-item', currentPage==='health' && 'active']" @click="goTo('health')">
-                    <span class="icon">&#9829;</span> 健康检查
-                </div>
-                <div :class="['nav-item', currentPage==='recycle' && 'active']" @click="goTo('recycle')">
-                    <span class="icon">&#128465;</span> 回收站
                 </div>
             </div>
             <div class="nav-section">
@@ -307,10 +290,8 @@
                     <div class="card-title">快速操作</div>
                     <div class="btn-group">
                         <button class="btn btn-primary" @click="goTo('upload')">上传文件</button>
-                        <button class="btn btn-success" @click="goTo('doc-create')">创建文档</button>
-                        <button class="btn btn-secondary" @click="goTo('ai-summarize')">AI 摘要</button>
-                        <button class="btn btn-warning" @click="goTo('rag')">RAG 问答</button>
-                        <button class="btn btn-secondary" @click="goTo('agent-chat')">Agent 对话</button>
+                        <button class="btn btn-success" @click="goTo('ai-chat')">AI 文档生成</button>
+                        <button class="btn btn-warning" @click="goTo('rag')">知识库问答</button>
                     </div>
                 </div>
                 <div class="card">
@@ -380,7 +361,7 @@
                         <p>点击或拖拽文件到此处上传</p>
                         <p style="font-size:12px;color:#aaa;margin-top:8px">文档：PDF、Word、PPT、CSV ｜ 文件：图片、压缩包</p>
                         <p style="font-size:12px;color:#aaa">系统将自动识别类型并分类存储</p>
-                        <input type="file" ref="fileInput" @change="handleFileSelect" accept=".pdf,.doc,.docx,.ppt,.pptx,.csv,image/*,.zip,.rar,.7z,.tar,.gz" multiple>
+                        <input type="file" ref="fileInput" @change="handleFileSelect" accept=".pdf,.doc,.docx,.ppt,.pptx,.csv,.md,image/*,.zip,.rar,.7z,.tar,.gz" multiple>
                     </div>
                     <div v-if="uploadFiles.length" style="margin-top:16px">
                         <div style="margin-bottom:8px;color:#666;font-size:14px">已选择 {{ uploadFiles.length }} 个文件</div>
@@ -412,6 +393,14 @@
                     <input v-model="docSearchKeyword" placeholder="搜索文档..." @keyup.enter="searchDocFiles">
                     <button class="btn btn-primary" @click="searchDocFiles">搜索</button>
                 </div>
+                <div style="display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;">
+                    <button :class="['btn', docTypeFilter==='' ? 'btn-primary' : 'btn-secondary']" @click="filterDocByType('')">全部</button>
+                    <button :class="['btn', docTypeFilter==='pdf' ? 'btn-primary' : 'btn-secondary']" @click="filterDocByType('pdf')">PDF</button>
+                    <button :class="['btn', docTypeFilter==='word' ? 'btn-primary' : 'btn-secondary']" @click="filterDocByType('word')">Word</button>
+                    <button :class="['btn', docTypeFilter==='ppt' ? 'btn-primary' : 'btn-secondary']" @click="filterDocByType('ppt')">PPT</button>
+                    <button :class="['btn', docTypeFilter==='csv' ? 'btn-primary' : 'btn-secondary']" @click="filterDocByType('csv')">CSV</button>
+                    <button :class="['btn', docTypeFilter==='md' ? 'btn-primary' : 'btn-secondary']" @click="filterDocByType('md')">Markdown</button>
+                </div>
                 <div class="card">
                     <table class="data-table">
                         <thead><tr><th>文件名</th><th>类型</th><th>当前版本</th><th>上传者</th><th>上传时间</th><th>操作</th></tr></thead>
@@ -438,63 +427,42 @@
                 </div>
             </div>
 
-            <!-- AI Summarize -->
-            <div v-if="currentPage==='ai-summarize'">
-                <div class="card">
-                    <div class="card-title">AI 文本摘要</div>
-                    <div class="form-group">
-                        <label>输入文本</label>
-                        <textarea v-model="aiContent" rows="8" placeholder="请输入需要摘要的文本内容..."></textarea>
+            <!-- AI Chat + File Generation -->
+            <div v-if="currentPage==='ai-chat'">
+                <div class="chat-container">
+                    <div class="chat-messages" ref="aiChatMessages">
+                        <div v-for="(msg, i) in aiChatHistory" :key="i" :class="['chat-msg', msg.role]">
+                            <div class="bubble" style="white-space:pre-wrap">{{ msg.content }}</div>
+                        </div>
+                        <div v-if="aiChatLoading" class="chat-msg assistant"><div class="bubble"><div class="spinner"></div></div></div>
                     </div>
-                    <div class="form-group">
-                        <label>最大长度</label>
-                        <input v-model.number="aiMaxLength" type="number" placeholder="200" style="width:200px">
-                    </div>
-                    <button class="btn btn-primary" @click="doSummarize" :disabled="aiLoading">{{ aiLoading ? '生成中...' : '生成摘要' }}</button>
-                </div>
-                <div v-if="aiResult" class="card">
-                    <div class="card-title">摘要结果</div>
-                    <div style="white-space:pre-wrap;line-height:1.8;padding:16px;background:#f0f4ff;border-radius:8px">{{ aiResult }}</div>
-                </div>
-            </div>
-
-            <!-- AI Keywords -->
-            <div v-if="currentPage==='ai-keywords'">
-                <div class="card">
-                    <div class="card-title">AI 关键词提取</div>
-                    <div class="form-group">
-                        <label>输入文本</label>
-                        <textarea v-model="aiContent" rows="8" placeholder="请输入需要提取关键词的文本内容..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>提取数量</label>
-                        <input v-model.number="aiKeywordCount" type="number" placeholder="5" style="width:200px">
-                    </div>
-                    <button class="btn btn-primary" @click="doExtractKeywords" :disabled="aiLoading">{{ aiLoading ? '提取中...' : '提取关键词' }}</button>
-                </div>
-                <div v-if="aiKeywords.length" class="card">
-                    <div class="card-title">提取结果</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px">
-                        <span v-for="k in aiKeywords" :key="k.keyword" class="tag tag-blue" style="font-size:14px;padding:6px 12px">
-                            {{ k.keyword }} <span style="font-size:11px;opacity:0.7;margin-left:4px">{{ (k.score*100).toFixed(0) }}%</span>
-                        </span>
+                    <div :class="['drag-handle', chatDragActive && 'dragging']" @mousedown.prevent="startChatDrag"></div>
+                    <div class="chat-input">
+                        <textarea v-model="aiChatInput" :placeholder="pptConversationId ? '回复AI的问题，完善你的需求...' : '描述你想要的PPT，例如：做一个关于Java反射机制的10页PPT'" @keydown.ctrl.enter="sendAiChat" :disabled="aiChatLoading"></textarea>
+                        <button class="btn-send" @click="sendAiChat" :disabled="aiChatLoading">&#9654;</button>
                     </div>
                 </div>
-            </div>
-
-            <!-- AI Analyze -->
-            <div v-if="currentPage==='ai-analyze'">
-                <div class="card">
-                    <div class="card-title">AI 文本分析</div>
-                    <div class="form-group">
-                        <label>输入文本</label>
-                        <textarea v-model="aiContent" rows="8" placeholder="请输入需要分析的文本内容..."></textarea>
-                    </div>
-                    <button class="btn btn-primary" @click="doAnalyze" :disabled="aiLoading">{{ aiLoading ? '分析中...' : '开始分析' }}</button>
-                </div>
-                <div v-if="aiAnalyzeResult" class="card">
-                    <div class="card-title">分析结果</div>
-                    <div style="white-space:pre-wrap;line-height:1.8;padding:16px;background:#f0f4ff;border-radius:8px">{{ aiAnalyzeResult }}</div>
+                <div class="card" style="margin-top:16px">
+                    <div class="card-title">最近生成文件</div>
+                    <table class="data-table" v-if="aiGeneratedFiles.length">
+                        <thead><tr><th>文件名</th><th>格式</th><th>创建者</th><th>时间</th><th>操作</th></tr></thead>
+                        <tbody>
+                            <tr v-for="f in aiGeneratedFiles" :key="f.id">
+                                <td>{{ f.title }}</td>
+                                <td><span class="tag tag-blue">{{ f.fileFormat }}</span></td>
+                                <td>{{ f.createBy }}</td>
+                                <td>{{ formatTime(f.createTime) }}</td>
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-primary" @click="downloadGeneratedFile(f.id, f.title)">下载</button>
+                                        <button v-if="f.fileFormat==='pdf' || f.fileFormat==='ppt'" class="btn btn-sm btn-secondary" @click="previewGeneratedFile(f.id, f.fileFormat)">预览</button>
+                                        <button class="btn btn-sm btn-danger" @click="deleteGeneratedFile(f.id)">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="!aiGeneratedFiles.length" class="empty-state"><p>暂无生成文件</p></div>
                 </div>
             </div>
 
@@ -503,164 +471,60 @@
                 <div class="chat-container">
                     <div class="chat-messages" ref="ragMessages">
                         <div v-for="(msg, i) in ragHistory" :key="i" :class="['chat-msg', msg.role]">
-                            <div class="bubble">{{ msg.content }}</div>
+                            <div class="bubble" style="white-space:pre-wrap">
+                                <div v-if="msg.sources && msg.sources.length" style="color:#667eea;font-size:12px;margin-bottom:6px;">
+                                    根据以下文件回答：{{ msg.sources.map(s => s.fileName || s.id).join('、') }}
+                                </div>
+                                {{ msg.content }}
+                            </div>
                         </div>
                         <div v-if="ragLoading" class="chat-msg assistant"><div class="bubble"><div class="spinner"></div></div></div>
                     </div>
+                    <div :class="['drag-handle', chatDragActive && 'dragging']" @mousedown.prevent="startChatDrag"></div>
                     <div class="chat-input">
-                        <input v-model="ragQuery" placeholder="输入问题，基于知识库回答..." @keyup.enter="doRagQuery">
-                        <select v-model="ragStrategy" style="width:120px">
-                            <option value="hybrid">混合搜索</option>
-                            <option value="vector">向量搜索</option>
-                            <option value="rerank">重排序</option>
-                        </select>
-                        <button class="btn btn-primary" @click="doRagQuery" :disabled="ragLoading">发送</button>
+                        <textarea v-model="ragQuery" placeholder="输入问题，基于知识库回答... (Ctrl+Enter发送)&#10;提示：知识库仅支持 Markdown、Word、PDF、CSV 格式文件" @keydown.ctrl.enter="doRagQuery"></textarea>
+                        <button class="btn-send" @click="doRagQuery" :disabled="ragLoading">&#9654;</button>
                     </div>
-                </div>
-            </div>
-
-            <!-- RAG Index Management -->
-            <div v-if="currentPage==='rag-manage'">
-                <div class="card">
-                    <div class="card-title">索引文档</div>
-                    <div class="form-row">
-                        <div class="form-group"><label>文档ID</label><input v-model="ragIndexDocId" placeholder="文档ID"></div>
-                    </div>
-                    <div class="form-group"><label>文档内容</label><textarea v-model="ragIndexContent" rows="6" placeholder="输入要索引的文档内容..."></textarea></div>
-                    <button class="btn btn-primary" @click="indexRagDocument">添加索引</button>
-                </div>
-                <div class="card">
-                    <div class="card-title">已索引文档</div>
-                    <button class="btn btn-sm btn-secondary" @click="loadRagDocuments" style="margin-bottom:12px">刷新</button>
-                    <table class="data-table" v-if="ragDocuments.length">
-                        <thead><tr><th>文档ID</th><th>操作</th></tr></thead>
-                        <tbody>
-                            <tr v-for="docId in ragDocuments" :key="docId">
-                                <td>{{ docId }}</td>
-                                <td>
-                                    <div class="btn-group">
-                                        <button class="btn btn-sm btn-secondary" @click="getRagDocContent(docId)">查看</button>
-                                        <button class="btn btn-sm btn-secondary" @click="getRagDocMeta(docId)">元数据</button>
-                                        <button class="btn btn-sm btn-danger" @click="deleteRagDocument(docId)">删除</button>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div v-if="!ragDocuments.length" class="empty-state"><div class="icon">&#128218;</div><p>暂无索引文档</p></div>
-                </div>
-                <div v-if="ragDocContent" class="card">
-                    <div class="card-title">文档内容</div>
-                    <div style="white-space:pre-wrap;padding:16px;background:#f8fafc;border-radius:8px;max-height:300px;overflow-y:auto">{{ ragDocContent }}</div>
-                </div>
-                <div v-if="ragDocMeta" class="card">
-                    <div class="card-title">文档元数据</div>
-                    <pre style="padding:16px;background:#f8fafc;border-radius:8px">{{ JSON.stringify(ragDocMeta, null, 2) }}</pre>
-                </div>
-            </div>
-
-            <!-- Agent Chat -->
-            <div v-if="currentPage==='agent-chat'">
-                <div class="chat-container">
-                    <div class="chat-messages" ref="agentMessages">
-                        <div v-for="(msg, i) in agentHistory" :key="i" :class="['chat-msg', msg.role]">
-                            <div class="bubble">{{ msg.content }}</div>
-                        </div>
-                        <div v-if="agentLoading" class="chat-msg assistant"><div class="bubble"><div class="spinner"></div></div></div>
-                    </div>
-                    <div class="chat-input">
-                        <input v-model="agentInput" placeholder="输入消息与 Agent 对话..." @keyup.enter="sendAgentMessage">
-                        <button v-if="!agentConversationId" class="btn btn-success" @click="startAgentChat">开始会话</button>
-                        <button v-else class="btn btn-primary" @click="sendAgentMessage" :disabled="agentLoading">发送</button>
-                        <button v-if="agentConversationId" class="btn btn-danger" @click="endAgentChat">结束</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Plan Execute -->
-            <div v-if="currentPage==='plan-execute'">
-                <div class="card">
-                    <div class="card-title">Agent 计划执行</div>
-                    <div class="form-group">
-                        <label>任务描述</label>
-                        <textarea v-model="planTask" rows="4" placeholder="描述需要 Agent 执行的任务..."></textarea>
-                    </div>
-                    <button class="btn btn-primary" @click="executePlan" :disabled="planLoading">{{ planLoading ? '执行中...' : '执行计划' }}</button>
-                </div>
-                <div v-if="planResult" class="card">
-                    <div class="card-title">执行结果</div>
-                    <pre style="padding:16px;background:#f8fafc;border-radius:8px;white-space:pre-wrap">{{ JSON.stringify(planResult, null, 2) }}</pre>
                 </div>
             </div>
 
             <!-- AIOps Monitor -->
             <div v-if="currentPage==='aiops'">
                 <div class="stat-cards">
-                    <div class="stat-card blue"><div class="label">API 调用次数</div><div class="value">{{ aiopsMetrics.counters?.api_calls || 0 }}</div></div>
-                    <div class="stat-card red"><div class="label">错误次数</div><div class="value">{{ aiopsMetrics.counters?.errors || 0 }}</div></div>
-                    <div class="stat-card green"><div class="label">平均响应时间</div><div class="value">{{ aiopsMetrics.timers?.avg_response_time || 0 }}ms</div></div>
-                    <div class="stat-card orange"><div class="label">运行时间</div><div class="value">{{ formatUptime(aiopsMetrics.uptime || 0) }}</div></div>
+                    <div class="stat-card blue"><div class="label">RAG 切片数</div><div class="value">{{ aiopsMetrics.ragSliceCount || 0 }}</div></div>
+                    <div class="stat-card green"><div class="label">PPT 生成数</div><div class="value">{{ aiopsMetrics.pptCount || 0 }}</div></div>
+                    <div class="stat-card orange"><div class="label">总 Input Tokens</div><div class="value">{{ (aiopsMetrics.totalTokensInput || 0).toLocaleString() }}</div></div>
+                    <div class="stat-card red"><div class="label">总 Output Tokens</div><div class="value">{{ (aiopsMetrics.totalTokensOutput || 0).toLocaleString() }}</div></div>
                 </div>
                 <div class="card">
-                    <div class="card-title">监控操作</div>
-                    <div class="btn-group">
-                        <button class="btn btn-primary" @click="loadAIOpsMetrics">刷新指标</button>
-                        <button class="btn btn-warning" @click="resetMetrics">重置指标</button>
-                        <button class="btn btn-secondary" @click="detectFaults">故障检测</button>
-                    </div>
-                </div>
-                <div v-if="aiopsFaults.length" class="card">
-                    <div class="card-title">故障列表</div>
+                    <div class="card-title">Token 用量明细</div>
                     <table class="data-table">
-                        <thead><tr><th>类型</th><th>级别</th><th>描述</th><th>状态</th><th>操作</th></tr></thead>
+                        <thead><tr><th>功能</th><th>Input Tokens</th><th>Output Tokens</th><th>其他</th></tr></thead>
                         <tbody>
-                            <tr v-for="f in aiopsFaults" :key="f.id || f.type">
-                                <td>{{ f.type }}</td>
-                                <td><span :class="'tag ' + (f.severity==='WARNING'?'tag-orange':'tag-red')">{{ f.severity }}</span></td>
-                                <td>{{ f.message }}</td>
-                                <td><span :class="'tag ' + (f.resolved?'tag-green':'tag-red')">{{ f.resolved ? '已解决' : '未解决' }}</span></td>
-                                <td><button v-if="!f.resolved" class="btn btn-sm btn-success" @click="resolveFault(f.id)">解决</button></td>
+                            <tr>
+                                <td>RAG 知识库</td>
+                                <td>{{ (aiopsMetrics.ragTokensInput || 0).toLocaleString() }}</td>
+                                <td>{{ (aiopsMetrics.ragTokensOutput || 0).toLocaleString() }}</td>
+                                <td>{{ aiopsMetrics.ragDocCount || 0 }} 篇文档 · {{ aiopsMetrics.ragSliceCount || 0 }} 个切片</td>
+                            </tr>
+                            <tr>
+                                <td>PPT 生成</td>
+                                <td>{{ (aiopsMetrics.pptTokensInput || 0).toLocaleString() }}</td>
+                                <td>{{ (aiopsMetrics.pptTokensOutput || 0).toLocaleString() }}</td>
+                                <td>{{ aiopsMetrics.pptCount || 0 }} 个 PPT</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-            </div>
-
-            <!-- Health -->
-            <div v-if="currentPage==='health'">
                 <div class="card">
-                    <div class="card-title">系统健康状态</div>
-                    <button class="btn btn-sm btn-primary" @click="loadHealth" style="margin-bottom:16px">刷新</button>
-                    <div class="health-grid">
-                        <div v-for="(status, name) in healthData.components || {}" :key="name" :class="['health-item', status==='UP'?'up':'down']">
-                            <div class="name">{{ name }}</div>
-                            <div class="status">{{ status }}</div>
-                        </div>
+                    <div class="card-title">AI 智能分析</div>
+                    <div v-if="aiAnalysis" style="line-height:1.8;font-size:14px;color:#444;white-space:pre-wrap">{{ aiAnalysis }}</div>
+                    <div v-else class="empty-state"><p>点击下方按钮，AI 将分析当前系统使用情况</p></div>
+                    <div class="modal-actions" style="margin-top:12px">
+                        <button class="btn btn-primary" @click="runAiAnalysis" :disabled="aiAnalysisLoading">{{ aiAnalysisLoading ? '分析中...' : 'AI 分析' }}</button>
+                        <button class="btn btn-secondary" @click="loadAIOpsMetrics">刷新数据</button>
+                        <button class="btn btn-warning" @click="resetMetrics">重置</button>
                     </div>
-                    <div v-if="!healthData.components" class="empty-state"><p>点击刷新获取健康状态</p></div>
-                </div>
-            </div>
-
-            <!-- Recycle Bin -->
-            <div v-if="currentPage==='recycle'">
-                <div class="card">
-                    <div class="card-title">回收站</div>
-                    <div class="search-bar">
-                        <input v-model="recycleBucket" placeholder="桶名称" style="width:200px">
-                        <button class="btn btn-primary" @click="loadRecycleBin">查询</button>
-                    </div>
-                    <table class="data-table" v-if="recycleFiles.length">
-                        <thead><tr><th>文件名</th><th>删除时间</th><th>大小</th><th>操作</th></tr></thead>
-                        <tbody>
-                            <tr v-for="f in recycleFiles" :key="f.objectName">
-                                <td>{{ f.objectName }}</td>
-                                <td>{{ formatTime(f.deleteTime) }}</td>
-                                <td>{{ formatSize(f.size) }}</td>
-                                <td><button class="btn btn-sm btn-success" @click="restoreFile(f.objectName)">恢复</button></td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div v-if="!recycleFiles.length && recycleQueried" class="empty-state"><div class="icon">&#128465;</div><p>回收站为空</p></div>
                 </div>
             </div>
 
@@ -734,6 +598,21 @@
                 </div>
             </div>
 
+            <!-- Confirm Modal -->
+            <div v-if="showModal==='confirm'" class="modal-overlay" @click.self="cancelConfirm">
+                <div class="modal" style="max-width:420px">
+                    <h3 style="display:flex;align-items:center;gap:10px">
+                        <span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:#ffebee;color:#ef5350;font-size:18px">!</span>
+                        {{ confirmData.title }}
+                    </h3>
+                    <p style="color:#666;font-size:14px;margin-top:4px">{{ confirmData.message }}</p>
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" @click="cancelConfirm">取消</button>
+                        <button class="btn btn-danger" @click="doConfirm">删除</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -745,8 +624,8 @@ const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
 createApp({
     setup() {
         // Auth
-        const token = ref(localStorage.getItem('docai_token') || '');
-        const refreshToken = ref(localStorage.getItem('docai_refresh') || '');
+        const token = ref(localStorage.getItem('docmanager_token') || '');
+        const refreshToken = ref(localStorage.getItem('docmanager_refresh') || '');
         const authMode = ref('login');
         const authError = ref('');
         const authLoading = ref(false);
@@ -757,6 +636,26 @@ createApp({
         // Pages
         const currentPage = ref('dashboard');
         const showModal = ref(null);
+        const confirmData = reactive({ title: '', message: '', onConfirm: null });
+
+        function showConfirm(title, message) {
+            return new Promise((resolve) => {
+                confirmData.title = title;
+                confirmData.message = message;
+                confirmData.onConfirm = () => resolve(true);
+                showModal.value = 'confirm';
+            });
+        }
+        function doConfirm() {
+            const cb = confirmData.onConfirm;
+            showModal.value = null;
+            confirmData.onConfirm = null;
+            if (cb) cb();
+        }
+        function cancelConfirm() {
+            showModal.value = null;
+            confirmData.onConfirm = null;
+        }
         const toast = reactive({ show: false, message: '', type: 'success' });
 
         // Files
@@ -773,6 +672,7 @@ createApp({
         // Documents
         const docList = ref([]);
         const docSearchKeyword = ref('');
+        const docTypeFilter = ref('');
         const globalDocVersion = ref('');
         const recentDocs = ref([]);
         const versionList = ref([]);
@@ -784,44 +684,48 @@ createApp({
         const newVersionChangeLog = ref('');
         const newVersionFile = ref(null);
 
-        // AI
-        const aiContent = ref('');
-        const aiMaxLength = ref(200);
-        const aiKeywordCount = ref(5);
-        const aiResult = ref('');
-        const aiKeywords = ref([]);
-        const aiAnalyzeResult = ref('');
-        const aiLoading = ref(false);
+        // AI Chat
+        const aiChatHistory = ref([]);
+        const aiChatInput = ref('');
+        const aiChatLoading = ref(false);
+        const aiChatFormat = ref('');
+        const aiGeneratedFiles = ref([]);
+        const pptConversationId = ref('');
 
         // RAG
         const ragQuery = ref('');
         const ragStrategy = ref('hybrid');
         const ragHistory = ref([]);
         const ragLoading = ref(false);
-        const ragIndexDocId = ref('');
-        const ragIndexContent = ref('');
-        const ragDocuments = ref([]);
-        const ragDocContent = ref('');
-        const ragDocMeta = ref(null);
 
-        // Agent
-        const agentConversationId = ref('');
-        const agentInput = ref('');
-        const agentHistory = ref([]);
-        const agentLoading = ref(false);
+        // Chat resize drag
+        const chatDragActive = ref(false);
 
-        // Plan
-        const planTask = ref('');
-        const planResult = ref(null);
-        const planLoading = ref(false);
+        function startChatDrag() {
+            chatDragActive.value = true;
+            const container = document.querySelector('.chat-container');
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            const messages = container.querySelector('.chat-messages');
+
+            function onMove(e) {
+                const pct = Math.max(20, Math.min(85, ((e.clientY - rect.top) / rect.height) * 100));
+                messages.style.flex = 'none';
+                messages.style.height = pct + '%';
+            }
+            function onUp() {
+                chatDragActive.value = false;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        }
 
         // AIOps
         const aiopsMetrics = reactive({});
-        const aiopsFaults = ref([]);
-        const healthData = reactive({});
-        const recycleBucket = ref('doc-ai');
-        const recycleFiles = ref([]);
-        const recycleQueried = ref(false);
+        const aiAnalysis = ref('');
+        const aiAnalysisLoading = ref(false);
 
         // Stats
         const stats = reactive({ documents: 0, files: 0, ragDocs: 0, conversations: 0 });
@@ -830,17 +734,16 @@ createApp({
             const titles = {
                 dashboard: '仪表盘', files: '文件管理', upload: '文档与文件上传',
                 documents: '文档管理',
-                'ai-summarize': 'AI 文本摘要', 'ai-keywords': 'AI 关键词提取', 'ai-analyze': 'AI 文本分析',
-                rag: 'RAG 知识问答', 'rag-manage': '索引管理',
-                'agent-chat': 'Agent 对话', 'plan-execute': '计划执行',
-                aiops: '系统监控', health: '健康检查', recycle: '回收站', profile: '个人信息'
+                'ai-chat': 'PPT 生成',
+                rag: '知识库问答',
+                aiops: '系统监控', profile: '个人信息'
             };
-            return titles[currentPage.value] || 'DocAI';
+            return titles[currentPage.value] || 'DocManager';
         });
 
         // Axios setup
         function getAxios() {
-            const instance = axios.create({ baseURL: API, timeout: 30000 });
+            const instance = axios.create({ baseURL: API, timeout: 300000 });
             instance.interceptors.request.use(config => {
                 if (token.value) config.headers['Authorization'] = 'Bearer ' + token.value;
                 return config;
@@ -853,7 +756,7 @@ createApp({
                             const r = await axios.post(API + '/api/users/refresh', null, { params: { refreshToken: refreshToken.value } });
                             if (r.data.code === 200) {
                                 token.value = r.data.data;
-                                localStorage.setItem('docai_token', token.value);
+                                localStorage.setItem('docmanager_token', token.value);
                                 err.config.headers['Authorization'] = 'Bearer ' + token.value;
                                 return axios(err.config);
                             }
@@ -883,10 +786,10 @@ createApp({
                 if (r.data.code === 200) {
                     const d = r.data.data;
                     token.value = d.accessToken; refreshToken.value = d.refreshToken;
-                    localStorage.setItem('docai_token', d.accessToken);
-                    localStorage.setItem('docai_refresh', d.refreshToken);
+                    localStorage.setItem('docmanager_token', d.accessToken);
+                    localStorage.setItem('docmanager_refresh', d.refreshToken);
                     Object.assign(currentUser, d.user);
-                    localStorage.setItem('docai_user', JSON.stringify(d.user));
+                    localStorage.setItem('docmanager_user', JSON.stringify(d.user));
                     showToast('登录成功');
                     loadDashboardData();
                 } else { authError.value = r.data.message; }
@@ -910,7 +813,7 @@ createApp({
             const api = getAxios();
             api.post(API + '/api/users/logout').catch(() => {});
             token.value = ''; refreshToken.value = '';
-            localStorage.removeItem('docai_token'); localStorage.removeItem('docai_refresh'); localStorage.removeItem('docai_user');
+            localStorage.removeItem('docmanager_token'); localStorage.removeItem('docmanager_refresh'); localStorage.removeItem('docmanager_user');
             Object.assign(currentUser, { id: null, username: '', email: '', phone: '', role: '', status: 1 });
             authMode.value = 'login';
         }
@@ -922,8 +825,7 @@ createApp({
             else if (page === 'documents') loadDocuments();
             else if (page === 'dashboard') loadDashboardData();
             else if (page === 'aiops') loadAIOpsMetrics();
-            else if (page === 'health') loadHealth();
-            else if (page === 'rag-manage') loadRagDocuments();
+            else if (page === 'ai-chat') loadAiGeneratedFiles();
         }
 
         // Dashboard
@@ -988,9 +890,9 @@ createApp({
             const type = (file.type || '').toLowerCase();
             const name = (file.name || '').toLowerCase();
             return type.includes('pdf') || type.includes('word') || type.includes('msword')
-                || type.includes('csv') || type.includes('powerpoint') || type.includes('presentation')
+                || type.includes('csv') || type.includes('markdown') || type.includes('powerpoint') || type.includes('presentation')
                 || name.endsWith('.pdf') || name.endsWith('.doc') || name.endsWith('.docx')
-                || name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.csv');
+                || name.endsWith('.ppt') || name.endsWith('.pptx') || name.endsWith('.csv') || name.endsWith('.md');
         }
 
         function handleFileSelect(e) {
@@ -1057,7 +959,7 @@ createApp({
         }
 
         async function deleteFile(fileId) {
-            if (!confirm('确定删除此文件？')) return;
+            if (!await showConfirm('删除文件', '确定要删除此文件吗？此操作不可撤销。')) return;
             try {
                 const api = getAxios();
                 await api.delete(API + '/api/files/' + fileId);
@@ -1093,7 +995,24 @@ createApp({
                     const kw = docSearchKeyword.value.toLowerCase();
                     docList.value = docList.value.filter(d => d.title.toLowerCase().includes(kw));
                 }
+                if (docTypeFilter.value) {
+                    const tf = docTypeFilter.value.toLowerCase();
+                    docList.value = docList.value.filter(d => {
+                        const type = (d.fileType || '').toLowerCase();
+                        if (tf === 'pdf') return type.includes('pdf');
+                        if (tf === 'word') return type.includes('word') || type.includes('msword');
+                        if (tf === 'ppt') return type.includes('powerpoint') || type.includes('presentation');
+                        if (tf === 'csv') return type.includes('csv');
+                        if (tf === 'md') return type.includes('markdown') || d.title.toLowerCase().endsWith('.md');
+                        return true;
+                    });
+                }
             });
+        }
+
+        function filterDocByType(type) {
+            docTypeFilter.value = type;
+            searchDocFiles();
         }
 
         async function downloadDocFile(fileId, fileName) {
@@ -1153,7 +1072,7 @@ createApp({
         }
 
         async function deleteDocFile(id) {
-            if (!confirm('确定删除此文档？')) return;
+            if (!await showConfirm('删除文档', '确定要删除此文档吗？此操作不可撤销。')) return;
             try {
                 const api = getAxios();
                 await api.delete(API + '/api/documents/files/' + id);
@@ -1167,40 +1086,74 @@ createApp({
             if (type.includes('pdf')) return 'PDF';
             if (type.includes('word') || type.includes('msword')) return 'Word';
             if (type.includes('csv')) return 'CSV';
+            if (type.includes('markdown')) return 'Markdown';
             if (type.includes('powerpoint') || type.includes('presentation')) return 'PPT';
             if (type.includes('excel') || type.includes('spreadsheet')) return 'Excel';
             return type;
         }
 
-        // AI
-        async function doSummarize() {
-            aiLoading.value = true; aiResult.value = '';
+        // AI Chat
+        async function sendAiChat() {
+            if (!aiChatInput.value.trim()) return;
+            aiChatHistory.value.push({ role: 'user', content: aiChatInput.value });
+            const msg = aiChatInput.value; aiChatInput.value = ''; aiChatLoading.value = true;
+            await nextTick();
             try {
                 const api = getAxios();
-                const r = await api.post(API + '/api/ai/summarize', { content: aiContent.value, maxLength: aiMaxLength.value });
-                aiResult.value = r.data.data?.summary || JSON.stringify(r.data.data);
-            } catch(e) { handleError(e, '摘要生成失败'); }
-            finally { aiLoading.value = false; }
+                const body = { message: msg };
+                if (pptConversationId.value) body.conversationId = pptConversationId.value;
+                const r = await api.post(API + '/api/ai/chat/ppt', body);
+                const data = r.data?.data;
+                if (!data) throw new Error('服务器返回空响应');
+                pptConversationId.value = data.conversationId || '';
+                if (data.type === 'file') {
+                    aiChatHistory.value.push({ role: 'assistant', content: 'PPT 已生成: ' + data.fileName });
+                    pptConversationId.value = '';
+                    loadAiGeneratedFiles();
+                } else {
+                    aiChatHistory.value.push({ role: 'assistant', content: data.question });
+                }
+            } catch(e) {
+                aiChatHistory.value.push({ role: 'assistant', content: '生成失败: ' + (e.response?.data?.message || e.message) });
+                pptConversationId.value = '';
+            }
+            finally { aiChatLoading.value = false; await nextTick(); scrollToBottom('aiChatMessages'); }
         }
 
-        async function doExtractKeywords() {
-            aiLoading.value = true; aiKeywords.value = [];
+        async function loadAiGeneratedFiles() {
             try {
                 const api = getAxios();
-                const r = await api.post(API + '/api/ai/keywords', { content: aiContent.value, count: aiKeywordCount.value });
-                aiKeywords.value = r.data.data?.keywords || [];
-            } catch(e) { handleError(e, '关键词提取失败'); }
-            finally { aiLoading.value = false; }
+                const r = await api.get(API + '/api/ai/chat/files');
+                aiGeneratedFiles.value = r.data.data || [];
+            } catch(e) {}
         }
 
-        async function doAnalyze() {
-            aiLoading.value = true; aiAnalyzeResult.value = '';
+        async function downloadGeneratedFile(id, fileName) {
             try {
                 const api = getAxios();
-                const r = await api.post(API + '/api/ai/analyze', { content: aiContent.value });
-                aiAnalyzeResult.value = r.data.data?.analysis || JSON.stringify(r.data.data, null, 2);
-            } catch(e) { handleError(e, '分析失败'); }
-            finally { aiLoading.value = false; }
+                const r = await api.get(API + '/api/ai/chat/files/' + id + '/download', { responseType: 'blob' });
+                const url = URL.createObjectURL(r.data);
+                const a = document.createElement('a'); a.href = url; a.download = fileName; a.click();
+                URL.revokeObjectURL(url);
+            } catch(e) { handleError(e, '下载失败'); }
+        }
+
+        function previewGeneratedFile(id, format) {
+            if (format === 'ppt') {
+                // HTML PPT 直接在新窗口打开
+                window.open(API + '/api/ai/chat/files/' + id + '/preview?token=' + token.value, '_blank');
+            } else {
+                window.open(API + '/api/ai/chat/files/' + id + '/preview?token=' + token.value, '_blank');
+            }
+        }
+
+        async function deleteGeneratedFile(id) {
+            if (!await showConfirm('删除文件', '确定要删除此文件吗？此操作不可撤销。')) return;
+            try {
+                const api = getAxios();
+                await api.delete(API + '/api/ai/chat/files/' + id);
+                showToast('删除成功'); loadAiGeneratedFiles();
+            } catch(e) { handleError(e, '删除失败'); }
         }
 
         // RAG
@@ -1221,53 +1174,18 @@ createApp({
                 }
                 const data = r.data.data;
                 let answer = '';
-                if (data?.answer) answer = data.answer;
-                else if (Array.isArray(data)) answer = data.map(d => `[相关度 ${(d.score||d.rerankScore||0).toFixed(2)}] ${d.content}`).join('\n\n');
-                else answer = JSON.stringify(data, null, 2);
-                ragHistory.value.push({ role: 'assistant', content: answer });
+                let sources = [];
+                if (data?.answer) {
+                    answer = data.answer;
+                    sources = data.sources || [];
+                } else if (Array.isArray(data)) {
+                    answer = data.map(d => `[相关度 ${(d.score||d.rerankScore||0).toFixed(2)}] ${d.content}`).join('\n\n');
+                } else {
+                    answer = JSON.stringify(data, null, 2);
+                }
+                ragHistory.value.push({ role: 'assistant', content: answer, sources });
             } catch(e) { ragHistory.value.push({ role: 'assistant', content: '查询失败: ' + (e.response?.data?.message || e.message) }); }
             finally { ragLoading.value = false; await nextTick(); scrollToBottom('ragMessages'); }
-        }
-
-        async function indexRagDocument() {
-            try {
-                const api = getAxios();
-                await api.post(API + '/api/ai/rag/index', ragIndexContent.value, { params: { documentId: ragIndexDocId.value }, headers: { 'Content-Type': 'text/plain' } });
-                showToast('索引成功'); loadRagDocuments();
-            } catch(e) { handleError(e, '索引失败'); }
-        }
-
-        async function loadRagDocuments() {
-            try {
-                const api = getAxios();
-                const r = await api.get(API + '/api/ai/rag/documents');
-                ragDocuments.value = r.data.data || [];
-            } catch(e) {}
-        }
-
-        async function getRagDocContent(docId) {
-            try {
-                const api = getAxios();
-                const r = await api.get(API + '/api/ai/rag/document/' + docId);
-                ragDocContent.value = r.data.data || '';
-            } catch(e) { handleError(e, '获取内容失败'); }
-        }
-
-        async function getRagDocMeta(docId) {
-            try {
-                const api = getAxios();
-                const r = await api.get(API + '/api/ai/rag/document/' + docId + '/metadata');
-                ragDocMeta.value = r.data.data;
-            } catch(e) { handleError(e, '获取元数据失败'); }
-        }
-
-        async function deleteRagDocument(docId) {
-            if (!confirm('确定删除此索引？')) return;
-            try {
-                const api = getAxios();
-                await api.delete(API + '/api/ai/rag/document/' + docId);
-                showToast('已删除'); loadRagDocuments();
-            } catch(e) { handleError(e, '删除失败'); }
         }
 
         // Agent
@@ -1327,56 +1245,23 @@ createApp({
             } catch(e) { handleError(e, '加载指标失败'); }
         }
 
-        async function loadHealth() {
-            try {
-                const api = getAxios();
-                const r = await api.get(API + '/api/ai/aiops/health');
-                Object.assign(healthData, r.data.data || {});
-            } catch(e) { handleError(e, '加载健康状态失败'); }
-        }
-
         async function resetMetrics() {
-            if (!confirm('确定重置所有监控指标？')) return;
+            if (!await showConfirm('重置监控', '确定要重置所有监控指标吗？')) return;
             try {
                 const api = getAxios();
-                await api.post(API + '/api/ai/aiops/metrics/reset');
-                showToast('指标已重置'); loadAIOpsMetrics();
+                await api.post(API + '/api/ai/aiops/reset');
+                showToast('指标已重置'); aiAnalysis.value = ''; loadAIOpsMetrics();
             } catch(e) { handleError(e, '重置失败'); }
         }
 
-        async function detectFaults() {
+        async function runAiAnalysis() {
+            aiAnalysisLoading.value = true;
             try {
                 const api = getAxios();
-                const r = await api.get(API + '/api/ai/aiops/detect');
-                aiopsFaults.value = r.data.data || [];
-                if (!aiopsFaults.value.length) showToast('未检测到故障');
-            } catch(e) { handleError(e, '故障检测失败'); }
-        }
-
-        async function resolveFault(faultId) {
-            try {
-                const api = getAxios();
-                await api.post(API + '/api/ai/aiops/faults/' + faultId + '/resolve');
-                showToast('故障已解决'); detectFaults();
-            } catch(e) { handleError(e, '解决失败'); }
-        }
-
-        // Recycle
-        async function loadRecycleBin() {
-            recycleQueried.value = true;
-            try {
-                const api = getAxios();
-                const r = await api.get(API + '/api/ai/recycle-bin', { params: { bucketName: recycleBucket.value } });
-                recycleFiles.value = r.data.data?.files || [];
-            } catch(e) { handleError(e, '加载回收站失败'); }
-        }
-
-        async function restoreFile(objectName) {
-            try {
-                const api = getAxios();
-                await api.post(API + '/api/ai/files/restore', { bucketName: recycleBucket.value, objectName });
-                showToast('文件已恢复'); loadRecycleBin();
-            } catch(e) { handleError(e, '恢复失败'); }
+                const r = await api.get(API + '/api/ai/aiops/analyze');
+                aiAnalysis.value = r.data.data?.analysis || '无分析结果';
+            } catch(e) { handleError(e, 'AI分析失败'); }
+            finally { aiAnalysisLoading.value = false; }
         }
 
         // Utils
@@ -1394,13 +1279,6 @@ createApp({
             return size.toFixed(1) + ' ' + units[i];
         }
 
-        function formatUptime(seconds) {
-            if (!seconds) return '0s';
-            const h = Math.floor(seconds / 3600);
-            const m = Math.floor((seconds % 3600) / 60);
-            return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
-        }
-
         function scrollToBottom(refName) {
             nextTick(() => {
                 const el = document.querySelector('.chat-messages');
@@ -1411,7 +1289,7 @@ createApp({
         // Init
         onMounted(() => {
             if (token.value) {
-                const saved = localStorage.getItem('docai_user');
+                const saved = localStorage.getItem('docmanager_user');
                 if (saved) Object.assign(currentUser, JSON.parse(saved));
                 loadDashboardData();
             }
@@ -1419,26 +1297,21 @@ createApp({
 
         return {
             token, authMode, authError, authLoading, loginForm, registerForm, currentUser,
-            currentPage, showModal, toast, pageTitle,
+            currentPage, showModal, toast, pageTitle, confirmData, doConfirm, cancelConfirm,
             fileList, filePage, fileTotalPages, fileSearchKeyword, fileTypeFilter, uploadFiles, uploading, renameNewName,
-            docList, docSearchKeyword, globalDocVersion,
+            docList, docSearchKeyword, docTypeFilter, globalDocVersion,
             recentDocs, versionList, versionDocTitle, versionDocId,
             newVersionDocId, newVersionDocTitle, newVersionNumber, newVersionChangeLog, newVersionFile,
-            aiContent, aiMaxLength, aiKeywordCount, aiResult, aiKeywords, aiAnalyzeResult, aiLoading,
-            ragQuery, ragStrategy, ragHistory, ragLoading, ragIndexDocId, ragIndexContent, ragDocuments, ragDocContent, ragDocMeta,
-            agentConversationId, agentInput, agentHistory, agentLoading,
-            planTask, planResult, planLoading,
-            aiopsMetrics, aiopsFaults, healthData, recycleBucket, recycleFiles, recycleQueried, stats,
+            aiChatHistory, aiChatInput, aiChatLoading, aiChatFormat, aiGeneratedFiles, pptConversationId,
+            ragQuery, ragStrategy, ragHistory, ragLoading, chatDragActive, startChatDrag,
+            aiopsMetrics, aiAnalysis, aiAnalysisLoading, runAiAnalysis, stats,
             login, register, logout, goTo,
             loadFiles, searchFiles, filterByType, resetFileType, handleFileSelect, handleDrop, uploadAllFiles, downloadFile, previewFile, deleteFile, showRenameModal, doRename,
-            loadDocuments, searchDocFiles, downloadDocFile, previewDoc, showNewVersionModal, onNewVersionFileSelect, uploadNewVersion, showDocVersions, restoreDocVersion, deleteDocFile, getFileTypeLabel,
-            doSummarize, doExtractKeywords, doAnalyze,
-            doRagQuery, indexRagDocument, loadRagDocuments, getRagDocContent, getRagDocMeta, deleteRagDocument,
-            startAgentChat, sendAgentMessage, endAgentChat,
-            executePlan,
-            loadAIOpsMetrics, loadHealth, resetMetrics, detectFaults, resolveFault,
-            loadRecycleBin, restoreFile,
-            formatTime, formatSize, formatUptime
+            loadDocuments, searchDocFiles, filterDocByType, downloadDocFile, previewDoc, showNewVersionModal, onNewVersionFileSelect, uploadNewVersion, showDocVersions, restoreDocVersion, deleteDocFile, getFileTypeLabel,
+            sendAiChat, loadAiGeneratedFiles, downloadGeneratedFile, previewGeneratedFile, deleteGeneratedFile,
+            doRagQuery,
+            loadAIOpsMetrics, resetMetrics,
+            formatTime, formatSize
         };
     }
 }).mount('#app');

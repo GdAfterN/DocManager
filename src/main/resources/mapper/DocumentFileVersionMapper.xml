@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.javaee.docai.doc.mapper.DocumentFileVersionMapper">
+<mapper namespace="com.javaee.docmanager.doc.mapper.DocumentFileVersionMapper">
 
-    <insert id="insert" parameterType="com.javaee.docai.doc.entity.DocumentFileVersion" useGeneratedKeys="false">
+    <insert id="insert" parameterType="com.javaee.docmanager.doc.entity.DocumentFileVersion" useGeneratedKeys="false">
         INSERT INTO document_file_version (id, document_id, file_id, version, change_log, uploaded_by, upload_time)
         VALUES (#{id}, #{documentId}, #{fileId}, #{version}, #{changeLog}, #{uploadedBy}, #{uploadTime})
     </insert>
 
-    <select id="selectByDocumentId" resultType="com.javaee.docai.doc.entity.DocumentFileVersion">
+    <select id="selectByDocumentId" resultType="com.javaee.docmanager.doc.entity.DocumentFileVersion">
         SELECT * FROM document_file_version WHERE document_id = #{documentId} ORDER BY upload_time DESC
     </select>
 
-    <select id="selectById" resultType="com.javaee.docai.doc.entity.DocumentFileVersion">
+    <select id="selectById" resultType="com.javaee.docmanager.doc.entity.DocumentFileVersion">
         SELECT * FROM document_file_version WHERE id = #{id}
     </select>
 

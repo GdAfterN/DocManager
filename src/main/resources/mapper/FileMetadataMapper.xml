@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.javaee.docai.file.mapper.FileMetadataMapper">
+<mapper namespace="com.javaee.docmanager.file.mapper.FileMetadataMapper">
 
-    <insert id="insert" parameterType="com.javaee.docai.file.entity.FileMetadata" useGeneratedKeys="false">
+    <insert id="insert" parameterType="com.javaee.docmanager.file.entity.FileMetadata" useGeneratedKeys="false">
         INSERT INTO file_metadata (id, file_id, file_name, original_file_name, file_path, file_type, file_size, md5, storage_type, bucket_name, object_key, status, create_by, create_time, update_time)
         VALUES (#{id}, #{fileId}, #{fileName}, #{originalFileName}, #{filePath}, #{fileType}, #{fileSize}, #{md5}, #{storageType}, #{bucketName}, #{objectKey}, #{status}, #{createBy}, #{createTime}, #{updateTime})
     </insert>
 
-    <select id="selectById" resultType="com.javaee.docai.file.entity.FileMetadata">
+    <select id="selectById" resultType="com.javaee.docmanager.file.entity.FileMetadata">
         SELECT * FROM file_metadata WHERE id = #{id}
     </select>
 
-    <select id="selectByFileId" resultType="com.javaee.docai.file.entity.FileMetadata">
+    <select id="selectByFileId" resultType="com.javaee.docmanager.file.entity.FileMetadata">
         SELECT * FROM file_metadata WHERE file_id = #{fileId}
     </select>
 
-    <update id="updateById" parameterType="com.javaee.docai.file.entity.FileMetadata">
+    <update id="updateById" parameterType="com.javaee.docmanager.file.entity.FileMetadata">
         UPDATE file_metadata
         SET file_name = #{fileName}, original_file_name = #{originalFileName}, file_path = #{filePath},
             file_type = #{fileType}, file_size = #{fileSize}, status = #{status}, update_time = #{updateTime}
         WHERE id = #{id}
     </update>
 
-    <update id="updateByFileId" parameterType="com.javaee.docai.file.entity.FileMetadata">
+    <update id="updateByFileId" parameterType="com.javaee.docmanager.file.entity.FileMetadata">
         UPDATE file_metadata
         SET file_name = #{fileName}, original_file_name = #{originalFileName}, file_path = #{filePath},
             file_type = #{fileType}, file_size = #{fileSize}, status = #{status}, update_time = #{updateTime}
@@ -33,7 +33,7 @@
         DELETE FROM file_metadata WHERE file_id = #{fileId}
     </delete>
 
-    <select id="selectList" resultType="com.javaee.docai.file.entity.FileMetadata">
+    <select id="selectList" resultType="com.javaee.docmanager.file.entity.FileMetadata">
         SELECT * FROM file_metadata
         <where>
             file_type IS NULL OR (file_type NOT LIKE '%pdf%' AND file_type NOT LIKE '%word%' AND file_type NOT LIKE '%msword%'
@@ -53,7 +53,7 @@
         LIMIT #{offset}, #{size}
     </select>
 
-    <select id="searchByKeyword" resultType="com.javaee.docai.file.entity.FileMetadata">
+    <select id="searchByKeyword" resultType="com.javaee.docmanager.file.entity.FileMetadata">
         SELECT * FROM file_metadata
         WHERE (file_name LIKE CONCAT('%', #{keyword}, '%') OR original_file_name LIKE CONCAT('%', #{keyword}, '%'))
         AND (file_type IS NULL OR (file_type NOT LIKE '%pdf%' AND file_type NOT LIKE '%word%' AND file_type NOT LIKE '%msword%'
@@ -78,7 +78,7 @@
             AND file_type NOT LIKE '%powerpoint%' AND file_type NOT LIKE '%presentation%'))
     </select>
 
-    <select id="selectByFileType" resultType="com.javaee.docai.file.entity.FileMetadata">
+    <select id="selectByFileType" resultType="com.javaee.docmanager.file.entity.FileMetadata">
         SELECT * FROM file_metadata
         <where>
             <choose>

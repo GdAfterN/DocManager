@@ -24,3 +24,10 @@ doc-minIO/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 第三方 skill 目录
+guizang-ppt-skill-main/
+
+# 测试/设计文档
+test*.md
+docAI-*.md
