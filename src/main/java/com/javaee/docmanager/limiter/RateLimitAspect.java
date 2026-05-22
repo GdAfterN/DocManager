@@ -8,16 +8,20 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Instant;
+import java.util.Collections;
 
 /**
  * 滑动窗口限流AOP切面
- * 使用Redis ZSet存储请求时间戳，ZRANGEBYSCORE清理窗口外记录
+ * 使用Redis ZSet + Lua脚本保证原子性
  */
 @Slf4j
 @Aspect
@@ -27,27 +31,35 @@ public class RateLimitAspect {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    private DefaultRedisScript<Long> rateLimitScript;
+
+    @Autowired
+    public void init() {
+        rateLimitScript = new DefaultRedisScript<>();
+        rateLimitScript.setScriptSource(new ResourceScriptSource(new ClassPathResource("lua/rate_limit.lua")));
+        rateLimitScript.setResultType(Long.class);
+    }
+
     @Around("@annotation(rateLimit)")
     public Object around(ProceedingJoinPoint joinPoint, RateLimit rateLimit) throws Throwable {
         String key = buildKey(rateLimit);
         long now = Instant.now().toEpochMilli();
         long windowStart = now - rateLimit.timeWindow() * 1000;
 
-        // 清理窗口外的旧记录
-        redisTemplate.opsForZSet().removeRangeByScore(key, 0, windowStart);
+        // Lua脚本原子执行：清理+计数+判断+记录
+        Long count = redisTemplate.execute(
+                rateLimitScript,
+                Collections.singletonList(key),
+                String.valueOf(windowStart),
+                String.valueOf(now),
+                String.valueOf(rateLimit.maxRequests()),
+                String.valueOf(rateLimit.timeWindow() + 1)
+        );
 
-        // 获取当前窗口内的请求数
-        Long count = redisTemplate.opsForZSet().zCard(key);
-
-        if (count != null && count >= rateLimit.maxRequests()) {
+        if (count != null && count > rateLimit.maxRequests()) {
             log.warn("触发限流: key={}, count={}, limit={}", key, count, rateLimit.maxRequests());
             throw new BusinessException("请求过于频繁，请稍后再试");
         }
-
-        // 添加当前请求
-        redisTemplate.opsForZSet().add(key, String.valueOf(now), now);
-        // 设置key过期时间（略大于窗口时间）
-        redisTemplate.expire(key, rateLimit.timeWindow() + 1, java.util.concurrent.TimeUnit.SECONDS);
 
         return joinPoint.proceed();
     }

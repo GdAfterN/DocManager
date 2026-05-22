@@ -1,5 +1,7 @@
 package com.javaee.docmanager.doc.service.impl;
 
+import com.javaee.docmanager.cache.CacheHelper;
+import com.javaee.docmanager.common.constant.RedisKeyEnum;
 import com.javaee.docmanager.doc.entity.DocumentFile;
 import com.javaee.docmanager.doc.entity.DocumentFileVersion;
 import com.javaee.docmanager.doc.mapper.DocumentBranchMapper;
@@ -24,8 +26,9 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     private final DocumentFileMapper documentFileMapper;
     private final DocumentFileVersionMapper documentFileVersionMapper;
     private final DocumentBranchMapper documentBranchMapper;
+    private final CacheHelper cacheHelper;
 
-    private static final int MAX_VERSIONS = 5;
+    private static final int MAX_VERSIONS = 10;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     @Override
@@ -59,6 +62,12 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         ver.setUploadedBy(createBy);
         ver.setUploadTime(now);
         documentFileVersionMapper.insert(ver);
+
+        // 删除缓存
+        cacheHelper.deleteAfterUpdate(
+                RedisKeyEnum.DOC_FILE_LIST.getKey(),
+                RedisKeyEnum.DOC_FILE.getKey(id)
+        );
 
         log.info("创建文档文件记录: {}, 版本: {}", title, version);
         return doc;
@@ -95,6 +104,13 @@ public class DocumentFileServiceImpl implements DocumentFileService {
             documentFileVersionMapper.deleteOldestVersionByBranch(documentId);
             count--;
         }
+
+        // 删除缓存
+        cacheHelper.deleteAfterUpdate(
+                RedisKeyEnum.DOC_FILE_LIST.getKey(),
+                RedisKeyEnum.DOC_FILE.getKey(documentId),
+                RedisKeyEnum.DOC_FILE_VERSIONS.getKey(documentId)
+        );
 
         log.info("文档 {} 上传新版本: {}", doc.getTitle(), version);
         return documentFileMapper.selectById(documentId);
@@ -142,6 +158,13 @@ public class DocumentFileServiceImpl implements DocumentFileService {
             count--;
         }
 
+        // 删除缓存
+        cacheHelper.deleteAfterUpdate(
+                RedisKeyEnum.DOC_FILE_LIST.getKey(),
+                RedisKeyEnum.DOC_FILE.getKey(documentId),
+                RedisKeyEnum.DOC_FILE_VERSIONS.getKey(documentId)
+        );
+
         log.info("文档 {} 已恢复到版本 {}", documentId, targetVersion.getVersion());
         return documentFileMapper.selectById(documentId);
     }
@@ -150,6 +173,13 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     @Transactional
     public void deleteDocument(String documentId) {
         documentBranchMapper.deleteBranchesByDocumentId(documentId);
+
+        // 删除缓存
+        cacheHelper.deleteAfterUpdate(
+                RedisKeyEnum.DOC_FILE_LIST.getKey(),
+                RedisKeyEnum.DOC_FILE.getKey(documentId),
+                RedisKeyEnum.DOC_FILE_VERSIONS.getKey(documentId)
+        );
     }
 
     @Override

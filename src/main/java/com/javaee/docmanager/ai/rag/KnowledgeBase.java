@@ -20,7 +20,6 @@ public class KnowledgeBase {
     private static final Logger log = LoggerFactory.getLogger(KnowledgeBase.class);
     private static final String DOCUMENT_PREFIX = "doc:";
     private static final String CONTENT_PREFIX = "content:";
-    private static final String VECTOR_PREFIX = "vector:";
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -48,10 +47,8 @@ public class KnowledgeBase {
 
         try {
             String docKey = DOCUMENT_PREFIX + documentId;
-            String contentKey = CONTENT_PREFIX + documentId;
 
             redisTemplate.opsForHash().putAll(docKey, metadata);
-            redisTemplate.opsForValue().set(contentKey, content);
             deleteChunks(documentId);
 
             List<String> chunks = chunker.chunk(content);
@@ -88,7 +85,6 @@ public class KnowledgeBase {
         log.info("从知识库移除文档: documentId={}", documentId);
         try {
             redisTemplate.delete(DOCUMENT_PREFIX + documentId);
-            redisTemplate.delete(CONTENT_PREFIX + documentId);
             deleteChunks(documentId);
             log.info("文档移除成功: documentId={}", documentId);
         } catch (Exception e) {
@@ -98,21 +94,38 @@ public class KnowledgeBase {
     }
 
     private void deleteChunks(String documentId) {
-        String pattern = VECTOR_PREFIX + documentId + "*";
-        Set<String> vectorKeys = redisTemplate.keys(pattern);
-        if (vectorKeys != null) {
-            for (String vectorKey : vectorKeys) {
-                String chunkId = vectorKey.substring(VECTOR_PREFIX.length());
-                redisTemplate.delete(vectorKey);
+        // 从 Redis content key 找到所有 chunk
+        String contentPattern = CONTENT_PREFIX + documentId + "::*";
+        Set<String> contentKeys = redisTemplate.keys(contentPattern);
+        if (contentKeys != null) {
+            for (String contentKey : contentKeys) {
+                String chunkId = contentKey.substring(CONTENT_PREFIX.length());
+                // 从 Qdrant 删除向量
+                try {
+                    vectorStore.delete(chunkId);
+                } catch (Exception e) {
+                    log.warn("Qdrant 向量删除失败: chunkId={}", chunkId);
+                }
+                // 从 Redis 删除 content 和 metadata
+                redisTemplate.delete(contentKey);
                 redisTemplate.delete("metadata:" + chunkId);
-                redisTemplate.delete(CONTENT_PREFIX + chunkId);
             }
         }
     }
 
     public String getDocumentContent(String documentId) {
         try {
-            return (String) redisTemplate.opsForValue().get(CONTENT_PREFIX + documentId);
+            // 从分块拼接全文，不再存储冗余的全文副本
+            List<String> chunks = new ArrayList<>();
+            int i = 0;
+            while (true) {
+                String chunkKey = CONTENT_PREFIX + documentId + "::" + i;
+                String chunk = (String) redisTemplate.opsForValue().get(chunkKey);
+                if (chunk == null) break;
+                chunks.add(chunk);
+                i++;
+            }
+            return chunks.isEmpty() ? null : String.join("\n", chunks);
         } catch (Exception e) {
             log.warn("获取文档内容失败", e);
             return null;
@@ -342,8 +355,7 @@ public class KnowledgeBase {
     }
 
     private String getChunkContent(String chunkId) {
-        String content = (String) redisTemplate.opsForValue().get(CONTENT_PREFIX + chunkId);
-        return content != null ? content : getDocumentContent(extractDocId(chunkId));
+        return (String) redisTemplate.opsForValue().get(CONTENT_PREFIX + chunkId);
     }
 
     private String getDocMetadata(String docId, String key) {

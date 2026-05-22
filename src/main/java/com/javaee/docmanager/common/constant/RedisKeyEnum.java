@@ -26,6 +26,13 @@ public enum RedisKeyEnum {
     // 文件相关
     FILE_UPLOAD_LOCK("file:upload:lock:%s", "文件上传锁定"),
     FILE_DOWNLOAD_COUNT("file:download:count:%s", "文件下载次数"),
+    FILE_METADATA("file:metadata:%s", "文件元数据"),
+    FILE_LIST("file:list", "文件列表"),
+
+    // 文档相关
+    DOC_FILE("docfile:info:%s", "文档文件信息"),
+    DOC_FILE_VERSIONS("docfile:versions:%s", "文档文件版本列表"),
+    DOC_FILE_LIST("docfile:list", "文档文件列表"),
     
     // 系统相关
     SYSTEM_CONFIG("system:config:%s", "系统配置"),

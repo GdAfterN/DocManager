@@ -3,6 +3,8 @@ package com.javaee.docmanager.file.service.impl;
 import com.javaee.docmanager.doc.service.DocumentFileService;
 import com.javaee.docmanager.ai.rag.TextExtractor;
 import com.javaee.docmanager.ai.rag.KnowledgeBase;
+import com.javaee.docmanager.cache.CacheHelper;
+import com.javaee.docmanager.common.constant.RedisKeyEnum;
 import com.javaee.docmanager.file.config.FileStorageConfig;
 import com.javaee.docmanager.file.config.MinioConfig;
 import com.javaee.docmanager.file.service.FileMetadataService;
@@ -62,6 +64,9 @@ public class FileServiceImpl implements FileService {
 
     @Autowired(required = false)
     private KnowledgeBase knowledgeBase;
+
+    @Autowired
+    private CacheHelper cacheHelper;
 
     // 用于存储分片上传的临时文件
     private final ConcurrentMap<String, ConcurrentMap<Integer, File>> chunkMap = new ConcurrentHashMap<>();
@@ -166,6 +171,9 @@ public class FileServiceImpl implements FileService {
                 // 数据库不可用时，继续执行，只记录日志
                 System.out.println("数据库不可用，跳过元数据保存: " + e.getMessage());
             }
+
+            // 删除缓存
+            cacheHelper.deleteAfterUpdate(RedisKeyEnum.FILE_LIST.getKey());
 
             return fileId;
         } catch (Exception e) {
@@ -374,6 +382,9 @@ public class FileServiceImpl implements FileService {
                 // 数据库不可用时，忽略错误
                 System.out.println("数据库不可用，跳过元数据保存: " + e.getMessage());
             }
+
+            // 删除缓存
+            cacheHelper.deleteAfterUpdate(RedisKeyEnum.FILE_LIST.getKey());
 
             return fileId;
         } catch (Exception e) {
@@ -592,6 +603,12 @@ public class FileServiceImpl implements FileService {
                 // 数据库不可用时，忽略错误
                 System.out.println("数据库不可用，跳过元数据删除: " + e.getMessage());
             }
+
+            // 删除缓存
+            cacheHelper.deleteAfterUpdate(
+                    RedisKeyEnum.FILE_LIST.getKey(),
+                    RedisKeyEnum.FILE_METADATA.getKey(fileId)
+            );
         } catch (Exception e) {
             throw new RuntimeException("文件删除失败: " + e.getMessage(), e);
         }
@@ -709,6 +726,11 @@ public class FileServiceImpl implements FileService {
                 // 数据库不可用时，忽略错误
                 System.out.println("数据库不可用，跳过元数据更新: " + e.getMessage());
             }
+
+            // 删除缓存
+            cacheHelper.deleteAfterUpdate(
+                    RedisKeyEnum.FILE_METADATA.getKey(fileId)
+            );
         } catch (Exception e) {
             throw new RuntimeException("文件重命名失败: " + e.getMessage(), e);
         }
@@ -818,6 +840,11 @@ public class FileServiceImpl implements FileService {
                 // 数据库不可用时，忽略错误
                 System.out.println("更新文件元数据失败: " + e.getMessage());
             }
+
+            // 删除缓存
+            cacheHelper.deleteAfterUpdate(
+                    RedisKeyEnum.FILE_METADATA.getKey(fileId)
+            );
         } catch (Exception e) {
             throw new RuntimeException("文件移动失败: " + e.getMessage(), e);
         }
@@ -937,6 +964,9 @@ public class FileServiceImpl implements FileService {
                 // 数据库不可用时，忽略错误
                 System.out.println("保存新文件元数据失败: " + e.getMessage());
             }
+
+            // 删除缓存
+            cacheHelper.deleteAfterUpdate(RedisKeyEnum.FILE_LIST.getKey());
 
             return newFileId;
         } catch (Exception e) {
