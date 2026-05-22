@@ -5,6 +5,7 @@ import com.javaee.docmanager.ai.rag.TextExtractor;
 import com.javaee.docmanager.common.model.Result;
 import com.javaee.docmanager.doc.entity.DocumentFile;
 import com.javaee.docmanager.doc.entity.DocumentFileVersion;
+import com.javaee.docmanager.doc.service.DocumentBranchService;
 import com.javaee.docmanager.doc.service.DocumentFileService;
 import com.javaee.docmanager.file.service.FileService;
 import com.javaee.docmanager.security.UserContext;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class DocumentController {
 
     private final DocumentFileService documentFileService;
+    private final DocumentBranchService documentBranchService;
     private final FileService fileService;
     private final KnowledgeBase knowledgeBase;
     private final TextExtractor textExtractor;
@@ -128,5 +130,40 @@ public class DocumentController {
         } catch (Exception e) {
             log.error("文档索引失败（不影响操作）", e);
         }
+    }
+
+    @GetMapping("/{documentId}/branches")
+    @Operation(summary = "获取文档分支列表")
+    public Result<List<DocumentFile>> getBranches(@PathVariable String documentId) {
+        return Result.success(documentBranchService.getBranches(documentId));
+    }
+
+    @PostMapping("/{documentId}/branches")
+    @Operation(summary = "创建分支")
+    public Result<DocumentFile> createBranch(
+            @PathVariable String documentId,
+            @RequestParam String sourceBranchName,
+            @RequestParam String newBranchName) {
+        String username = UserContext.getCurrentUsername();
+        return Result.success(documentBranchService.createBranch(documentId, sourceBranchName, newBranchName, username));
+    }
+
+    @PostMapping("/{documentId}/merge")
+    @Operation(summary = "合并分支")
+    public Result<DocumentFile> mergeBranch(
+            @PathVariable String documentId,
+            @RequestParam String sourceBranch,
+            @RequestParam String targetBranch) {
+        String username = UserContext.getCurrentUsername();
+        return Result.success(documentBranchService.mergeBranch(documentId, sourceBranch, targetBranch, username));
+    }
+
+    @DeleteMapping("/{documentId}/branches/{branchName}")
+    @Operation(summary = "删除分支")
+    public Result<Void> deleteBranch(
+            @PathVariable String documentId,
+            @PathVariable String branchName) {
+        documentBranchService.deleteBranch(documentId, branchName);
+        return Result.success();
     }
 }

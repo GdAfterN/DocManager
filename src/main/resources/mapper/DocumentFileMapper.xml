@@ -3,8 +3,8 @@
 <mapper namespace="com.javaee.docmanager.doc.mapper.DocumentFileMapper">
 
     <insert id="insert" parameterType="com.javaee.docmanager.doc.entity.DocumentFile" useGeneratedKeys="false">
-        INSERT INTO document_file (id, title, current_file_id, current_version, file_type, status, create_by, create_time, update_time)
-        VALUES (#{id}, #{title}, #{currentFileId}, #{currentVersion}, #{fileType}, #{status}, #{createBy}, #{createTime}, #{updateTime})
+        INSERT INTO document_file (id, document_id, branch_name, title, current_file_id, current_version, file_type, status, create_by, create_time, update_time)
+        VALUES (#{id}, #{documentId}, #{branchName}, #{title}, #{currentFileId}, #{currentVersion}, #{fileType}, #{status}, #{createBy}, #{createTime}, #{updateTime})
     </insert>
 
     <select id="selectById" resultType="com.javaee.docmanager.doc.entity.DocumentFile">
@@ -13,6 +13,10 @@
 
     <select id="selectAll" resultType="com.javaee.docmanager.doc.entity.DocumentFile">
         SELECT * FROM document_file WHERE status = 'active' ORDER BY update_time DESC
+    </select>
+
+    <select id="selectAllMainBranches" resultType="com.javaee.docmanager.doc.entity.DocumentFile">
+        SELECT * FROM document_file WHERE status = 'active' AND branch_name = 'main' ORDER BY update_time DESC
     </select>
 
     <update id="updateCurrentFile">

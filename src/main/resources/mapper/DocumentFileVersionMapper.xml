@@ -3,12 +3,16 @@
 <mapper namespace="com.javaee.docmanager.doc.mapper.DocumentFileVersionMapper">
 
     <insert id="insert" parameterType="com.javaee.docmanager.doc.entity.DocumentFileVersion" useGeneratedKeys="false">
-        INSERT INTO document_file_version (id, document_id, file_id, version, change_log, uploaded_by, upload_time)
-        VALUES (#{id}, #{documentId}, #{fileId}, #{version}, #{changeLog}, #{uploadedBy}, #{uploadTime})
+        INSERT INTO document_file_version (id, document_id, branch_id, file_id, version, change_log, uploaded_by, upload_time)
+        VALUES (#{id}, #{documentId}, #{branchId}, #{fileId}, #{version}, #{changeLog}, #{uploadedBy}, #{uploadTime})
     </insert>
 
     <select id="selectByDocumentId" resultType="com.javaee.docmanager.doc.entity.DocumentFileVersion">
         SELECT * FROM document_file_version WHERE document_id = #{documentId} ORDER BY upload_time DESC
+    </select>
+
+    <select id="selectByBranchId" resultType="com.javaee.docmanager.doc.entity.DocumentFileVersion">
+        SELECT * FROM document_file_version WHERE branch_id = #{branchId} ORDER BY upload_time DESC
     </select>
 
     <select id="selectById" resultType="com.javaee.docmanager.doc.entity.DocumentFileVersion">
@@ -20,8 +24,17 @@
         ORDER BY upload_time ASC LIMIT 1
     </delete>
 
+    <delete id="deleteOldestVersionByBranch">
+        DELETE FROM document_file_version WHERE branch_id = #{branchId}
+        ORDER BY upload_time ASC LIMIT 1
+    </delete>
+
     <select id="countByDocumentId" resultType="int">
         SELECT COUNT(*) FROM document_file_version WHERE document_id = #{documentId}
+    </select>
+
+    <select id="countByBranchId" resultType="int">
+        SELECT COUNT(*) FROM document_file_version WHERE branch_id = #{branchId}
     </select>
 
 </mapper>

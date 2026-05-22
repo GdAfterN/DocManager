@@ -14,7 +14,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.javaee.docmanager.user.mapper",
     "com.javaee.docmanager.file.mapper",
     "com.javaee.docmanager.doc.mapper",
-    "com.javaee.docmanager.ai.mapper"
+    "com.javaee.docmanager.ai.mapper",
+    "com.javaee.docmanager.ai.aiops"
 })
 public class DocManagerApplication {
 

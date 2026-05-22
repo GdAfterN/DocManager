@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public class DocumentFileVersion {
     private String id;
     private String documentId;
+    private String branchId;
     private String fileId;
     private String version;
     private String changeLog;

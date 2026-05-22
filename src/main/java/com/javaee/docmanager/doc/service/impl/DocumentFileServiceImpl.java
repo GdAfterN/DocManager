@@ -2,6 +2,7 @@ package com.javaee.docmanager.doc.service.impl;
 
 import com.javaee.docmanager.doc.entity.DocumentFile;
 import com.javaee.docmanager.doc.entity.DocumentFileVersion;
+import com.javaee.docmanager.doc.mapper.DocumentBranchMapper;
 import com.javaee.docmanager.doc.mapper.DocumentFileMapper;
 import com.javaee.docmanager.doc.mapper.DocumentFileVersionMapper;
 import com.javaee.docmanager.doc.service.DocumentFileService;
@@ -22,6 +23,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
 
     private final DocumentFileMapper documentFileMapper;
     private final DocumentFileVersionMapper documentFileVersionMapper;
+    private final DocumentBranchMapper documentBranchMapper;
 
     private static final int MAX_VERSIONS = 5;
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -34,6 +36,8 @@ public class DocumentFileServiceImpl implements DocumentFileService {
 
         DocumentFile doc = new DocumentFile();
         doc.setId(id);
+        doc.setDocumentId(id);
+        doc.setBranchName("main");
         doc.setTitle(title);
         doc.setCurrentFileId(fileId);
         doc.setCurrentVersion(version);
@@ -48,6 +52,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         DocumentFileVersion ver = new DocumentFileVersion();
         ver.setId(UUID.randomUUID().toString());
         ver.setDocumentId(id);
+        ver.setBranchId(id);
         ver.setFileId(fileId);
         ver.setVersion(version);
         ver.setChangeLog("初始版本");
@@ -73,6 +78,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         DocumentFileVersion ver = new DocumentFileVersion();
         ver.setId(UUID.randomUUID().toString());
         ver.setDocumentId(documentId);
+        ver.setBranchId(documentId);
         ver.setFileId(fileId);
         ver.setVersion(version);
         ver.setChangeLog(changeLog);
@@ -84,9 +90,9 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         documentFileMapper.updateCurrentFile(documentId, fileId, version, now.format(FMT));
 
         // 超过最大版本数时删除最老的
-        int count = documentFileVersionMapper.countByDocumentId(documentId);
+        int count = documentFileVersionMapper.countByBranchId(documentId);
         while (count > MAX_VERSIONS) {
-            documentFileVersionMapper.deleteOldestVersion(documentId);
+            documentFileVersionMapper.deleteOldestVersionByBranch(documentId);
             count--;
         }
 
@@ -96,12 +102,12 @@ public class DocumentFileServiceImpl implements DocumentFileService {
 
     @Override
     public List<DocumentFile> getAllDocuments() {
-        return documentFileMapper.selectAll();
+        return documentFileMapper.selectAllMainBranches();
     }
 
     @Override
     public List<DocumentFileVersion> getVersions(String documentId) {
-        return documentFileVersionMapper.selectByDocumentId(documentId);
+        return documentFileVersionMapper.selectByBranchId(documentId);
     }
 
     @Override
@@ -121,6 +127,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         DocumentFileVersion ver = new DocumentFileVersion();
         ver.setId(UUID.randomUUID().toString());
         ver.setDocumentId(documentId);
+        ver.setBranchId(documentId);
         ver.setFileId(targetVersion.getFileId());
         ver.setVersion(targetVersion.getVersion());
         ver.setChangeLog("恢复到版本 " + targetVersion.getVersion());
@@ -129,9 +136,9 @@ public class DocumentFileServiceImpl implements DocumentFileService {
         documentFileVersionMapper.insert(ver);
 
         // 超过最大版本数时删除最老的
-        int count = documentFileVersionMapper.countByDocumentId(documentId);
+        int count = documentFileVersionMapper.countByBranchId(documentId);
         while (count > MAX_VERSIONS) {
-            documentFileVersionMapper.deleteOldestVersion(documentId);
+            documentFileVersionMapper.deleteOldestVersionByBranch(documentId);
             count--;
         }
 
@@ -142,7 +149,7 @@ public class DocumentFileServiceImpl implements DocumentFileService {
     @Override
     @Transactional
     public void deleteDocument(String documentId) {
-        documentFileMapper.deleteById(documentId);
+        documentBranchMapper.deleteBranchesByDocumentId(documentId);
     }
 
     @Override

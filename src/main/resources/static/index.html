@@ -6,6 +6,7 @@
     <title>DocManager - 智能文档管理平台</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; background: #f0f2f5; color: #333; }
@@ -403,12 +404,13 @@
                 </div>
                 <div class="card">
                     <table class="data-table">
-                        <thead><tr><th>文件名</th><th>类型</th><th>当前版本</th><th>上传者</th><th>上传时间</th><th>操作</th></tr></thead>
+                        <thead><tr><th>文件名</th><th>类型</th><th>当前版本</th><th>分支</th><th>上传者</th><th>上传时间</th><th>操作</th></tr></thead>
                         <tbody>
                             <tr v-for="doc in docList" :key="doc.id">
                                 <td>{{ doc.title }}</td>
                                 <td><span class="tag tag-blue">{{ getFileTypeLabel(doc.fileType) }}</span></td>
                                 <td><span class="tag tag-green">{{ doc.currentVersion }}</span></td>
+                                <td><span class="tag tag-blue" style="cursor:pointer" @click="showBranches(doc)">{{ doc.branchName || 'main' }}</span></td>
                                 <td>{{ doc.createBy }}</td>
                                 <td>{{ formatTime(doc.updateTime) }}</td>
                                 <td>
@@ -417,6 +419,7 @@
                                         <button class="btn btn-sm btn-secondary" @click="previewDoc(doc)">预览</button>
                                         <button class="btn btn-sm btn-warning" @click="showNewVersionModal(doc)">上传新版本</button>
                                         <button class="btn btn-sm btn-secondary" @click="showDocVersions(doc)">版本历史</button>
+                                        <button class="btn btn-sm btn-secondary" @click="showBranches(doc)">分支</button>
                                         <button class="btn btn-sm btn-danger" @click="deleteDocFile(doc.id)">删除</button>
                                     </div>
                                 </td>
@@ -517,6 +520,13 @@
                     </table>
                 </div>
                 <div class="card">
+                    <div class="card-title">每日 Token 用量趋势（近 7 天）</div>
+                    <div style="position:relative;height:300px">
+                        <canvas id="tokenChart"></canvas>
+                    </div>
+                    <div v-if="!dailyTrends.length" class="empty-state"><p>暂无历史数据，使用后次日自动生成</p></div>
+                </div>
+                <div class="card">
                     <div class="card-title">AI 智能分析</div>
                     <div v-if="aiAnalysis" style="line-height:1.8;font-size:14px;color:#444;white-space:pre-wrap">{{ aiAnalysis }}</div>
                     <div v-else class="empty-state"><p>点击下方按钮，AI 将分析当前系统使用情况</p></div>
@@ -582,6 +592,79 @@
                     <div class="modal-actions">
                         <button class="btn btn-primary" @click="uploadNewVersion">上传</button>
                         <button class="btn btn-secondary" @click="showModal=null">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Branch List Modal -->
+            <div v-if="showModal==='branches'" class="modal-overlay" @click.self="showModal=null">
+                <div class="modal" style="width:550px">
+                    <h3>分支管理 - {{ branchDocTitle }}</h3>
+                    <ul class="version-list" v-if="branchList.length">
+                        <li v-for="b in branchList" :key="b.id" :style="b.branchName==='main' ? 'background:#f0f8ff' : ''">
+                            <div>
+                                <strong>{{ b.branchName }}</strong>
+                                <span v-if="b.branchName==='main'" class="tag tag-blue" style="margin-left:6px">主分支</span>
+                                <span style="margin-left:8px;color:#888">版本: {{ b.currentVersion }}</span>
+                                <span style="margin-left:8px;color:#aaa">{{ formatTime(b.updateTime) }}</span>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-primary" @click="switchToBranch(b)">版本历史</button>
+                                <button class="btn btn-sm btn-warning" @click="showNewVersionModal(b)">上传版本</button>
+                                <button v-if="b.branchName!=='main'" class="btn btn-sm btn-danger" @click="deleteBranch(b)">删除</button>
+                            </div>
+                        </li>
+                    </ul>
+                    <div v-else class="empty-state"><p>暂无分支</p></div>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" @click="showCreateBranchModal">新建分支</button>
+                        <button class="btn btn-success" @click="showMergeModal">合并分支</button>
+                        <button class="btn btn-secondary" @click="showModal=null">关闭</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Branch Modal -->
+            <div v-if="showBranchModal==='create'" class="modal-overlay" @click.self="showBranchModal=null">
+                <div class="modal" style="width:450px">
+                    <h3>新建分支</h3>
+                    <div class="form-group">
+                        <label>源分支</label>
+                        <select v-model="sourceBranchForCreate" style="width:100%;padding:8px">
+                            <option v-for="b in branchList" :key="b.id" :value="b.branchName">{{ b.branchName }}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>新分支名称</label>
+                        <input v-model="newBranchName" placeholder="例如：dev">
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn btn-primary" @click="createBranch">创建</button>
+                        <button class="btn btn-secondary" @click="showBranchModal=null">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Merge Branch Modal -->
+            <div v-if="showBranchModal==='merge'" class="modal-overlay" @click.self="showBranchModal=null">
+                <div class="modal" style="width:450px">
+                    <h3>合并分支</h3>
+                    <div class="form-group">
+                        <label>源分支（被合并）</label>
+                        <select v-model="mergeSource" style="width:100%;padding:8px">
+                            <option v-for="b in branchList" :key="b.id" :value="b.branchName">{{ b.branchName }}</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>目标分支（合并到）</label>
+                        <select v-model="mergeTarget" style="width:100%;padding:8px">
+                            <option v-for="b in branchList" :key="b.id" :value="b.branchName">{{ b.branchName }}</option>
+                        </select>
+                    </div>
+                    <p style="color:#888;font-size:13px;margin-top:8px">将"源分支"的当前文件复制到"目标分支"并创建新版本记录。</p>
+                    <div class="modal-actions">
+                        <button class="btn btn-success" @click="mergeBranch">合并</button>
+                        <button class="btn btn-secondary" @click="showBranchModal=null">取消</button>
                     </div>
                 </div>
             </div>
@@ -684,6 +767,16 @@ createApp({
         const newVersionChangeLog = ref('');
         const newVersionFile = ref(null);
 
+        // Branch management
+        const branchList = ref([]);
+        const branchDocId = ref('');
+        const branchDocTitle = ref('');
+        const showBranchModal = ref(null);
+        const newBranchName = ref('');
+        const sourceBranchForCreate = ref('');
+        const mergeSource = ref('');
+        const mergeTarget = ref('');
+
         // AI Chat
         const aiChatHistory = ref([]);
         const aiChatInput = ref('');
@@ -726,6 +819,8 @@ createApp({
         const aiopsMetrics = reactive({});
         const aiAnalysis = ref('');
         const aiAnalysisLoading = ref(false);
+        const dailyTrends = ref([]);
+        let tokenChartInstance = null;
 
         // Stats
         const stats = reactive({ documents: 0, files: 0, ragDocs: 0, conversations: 0 });
@@ -1081,6 +1176,73 @@ createApp({
             } catch(e) { handleError(e, '删除失败'); }
         }
 
+        async function showBranches(doc) {
+            branchDocId.value = doc.documentId || doc.id;
+            branchDocTitle.value = doc.title;
+            try {
+                const api = getAxios();
+                const r = await api.get(API + '/api/documents/' + branchDocId.value + '/branches');
+                branchList.value = r.data.data || [];
+                showModal.value = 'branches';
+            } catch(e) { handleError(e, '获取分支失败'); }
+        }
+
+        function showCreateBranchModal() {
+            sourceBranchForCreate.value = 'main';
+            newBranchName.value = '';
+            showBranchModal.value = 'create';
+        }
+
+        function showMergeModal() {
+            mergeSource.value = '';
+            mergeTarget.value = 'main';
+            showBranchModal.value = 'merge';
+        }
+
+        async function createBranch() {
+            if (!newBranchName.value) { showToast('请输入分支名称'); return; }
+            try {
+                const api = getAxios();
+                await api.post(API + '/api/documents/' + branchDocId.value + '/branches', null, {
+                    params: { sourceBranchName: sourceBranchForCreate.value, newBranchName: newBranchName.value }
+                });
+                showToast('分支创建成功');
+                showBranchModal.value = null;
+                showBranches({ id: branchDocId.value, title: branchDocTitle.value, documentId: branchDocId.value });
+            } catch(e) { handleError(e, '创建分支失败'); }
+        }
+
+        async function mergeBranch() {
+            if (!mergeSource.value || !mergeTarget.value) { showToast('请选择源分支和目标分支'); return; }
+            if (mergeSource.value === mergeTarget.value) { showToast('源分支和目标分支不能相同'); return; }
+            try {
+                const api = getAxios();
+                await api.post(API + '/api/documents/' + branchDocId.value + '/merge', null, {
+                    params: { sourceBranch: mergeSource.value, targetBranch: mergeTarget.value }
+                });
+                showToast('合并成功');
+                showBranchModal.value = null;
+                showModal.value = null;
+                loadDocuments();
+            } catch(e) { handleError(e, '合并失败'); }
+        }
+
+        async function deleteBranch(branch) {
+            if (!await showConfirm('删除分支', '确定要删除分支 "' + branch.branchName + '" 吗？')) return;
+            try {
+                const api = getAxios();
+                await api.delete(API + '/api/documents/' + branchDocId.value + '/branches/' + branch.branchName);
+                showToast('分支已删除');
+                showBranches({ id: branchDocId.value, title: branchDocTitle.value, documentId: branchDocId.value });
+            } catch(e) { handleError(e, '删除分支失败'); }
+        }
+
+        function switchToBranch(branch) {
+            versionDocTitle.value = branchDocTitle.value + ' [' + branch.branchName + ']';
+            versionDocId.value = branch.id;
+            showDocVersions({ id: branch.id, title: branchDocTitle.value + ' [' + branch.branchName + ']' });
+        }
+
         function getFileTypeLabel(type) {
             if (!type) return '未知';
             if (type.includes('pdf')) return 'PDF';
@@ -1243,6 +1405,50 @@ createApp({
                 const r = await api.get(API + '/api/ai/aiops/monitor');
                 Object.assign(aiopsMetrics, r.data.data || {});
             } catch(e) { handleError(e, '加载指标失败'); }
+            loadDailyTrends();
+        }
+
+        async function loadDailyTrends() {
+            try {
+                const api = getAxios();
+                const r = await api.get(API + '/api/ai/aiops/monitor/daily');
+                dailyTrends.value = r.data.data || [];
+                renderTokenChart();
+            } catch(e) { /* 静默处理 */ }
+        }
+
+        function renderTokenChart() {
+            const canvas = document.getElementById('tokenChart');
+            if (!canvas || !dailyTrends.value.length) return;
+            if (tokenChartInstance) tokenChartInstance.destroy();
+
+            const sorted = [...dailyTrends.value].sort((a, b) => a.date.localeCompare(b.date));
+            const labels = sorted.map(d => d.date.substring(5)); // MM-DD
+            const ragInput = sorted.map(d => d.ragTokensInput || 0);
+            const ragOutput = sorted.map(d => d.ragTokensOutput || 0);
+            const pptInput = sorted.map(d => d.pptTokensInput || 0);
+            const pptOutput = sorted.map(d => d.pptTokensOutput || 0);
+
+            tokenChartInstance = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'RAG Input', data: ragInput, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 },
+                        { label: 'RAG Output', data: ragOutput, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 },
+                        { label: 'PPT Input', data: pptInput, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.3 },
+                        { label: 'PPT Output', data: pptOutput, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, tension: 0.3 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: v => v >= 1000 ? (v/1000)+'k' : v } }
+                    }
+                }
+            });
         }
 
         async function resetMetrics() {
@@ -1302,15 +1508,18 @@ createApp({
             docList, docSearchKeyword, docTypeFilter, globalDocVersion,
             recentDocs, versionList, versionDocTitle, versionDocId,
             newVersionDocId, newVersionDocTitle, newVersionNumber, newVersionChangeLog, newVersionFile,
+            branchList, branchDocId, branchDocTitle, showBranchModal, newBranchName,
+            sourceBranchForCreate, mergeSource, mergeTarget,
             aiChatHistory, aiChatInput, aiChatLoading, aiChatFormat, aiGeneratedFiles, pptConversationId,
             ragQuery, ragStrategy, ragHistory, ragLoading, chatDragActive, startChatDrag,
-            aiopsMetrics, aiAnalysis, aiAnalysisLoading, runAiAnalysis, stats,
+            aiopsMetrics, aiAnalysis, aiAnalysisLoading, runAiAnalysis, dailyTrends, stats,
             login, register, logout, goTo,
             loadFiles, searchFiles, filterByType, resetFileType, handleFileSelect, handleDrop, uploadAllFiles, downloadFile, previewFile, deleteFile, showRenameModal, doRename,
             loadDocuments, searchDocFiles, filterDocByType, downloadDocFile, previewDoc, showNewVersionModal, onNewVersionFileSelect, uploadNewVersion, showDocVersions, restoreDocVersion, deleteDocFile, getFileTypeLabel,
+            showBranches, showCreateBranchModal, showMergeModal, createBranch, mergeBranch, deleteBranch, switchToBranch,
             sendAiChat, loadAiGeneratedFiles, downloadGeneratedFile, previewGeneratedFile, deleteGeneratedFile,
             doRagQuery,
-            loadAIOpsMetrics, resetMetrics,
+            loadAIOpsMetrics, loadDailyTrends, resetMetrics,
             formatTime, formatSize
         };
     }

@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 @Data
 public class DocumentFile {
     private String id;
+    private String documentId;
+    private String branchName;
     private String title;
     private String currentFileId;
     private String currentVersion;

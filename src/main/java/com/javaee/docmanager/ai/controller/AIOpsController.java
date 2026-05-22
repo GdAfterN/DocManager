@@ -1,11 +1,14 @@
 package com.javaee.docmanager.ai.controller;
 
+import com.javaee.docmanager.ai.aiops.MetricsDaily;
+import com.javaee.docmanager.ai.aiops.MetricsDailyMapper;
 import com.javaee.docmanager.ai.aiops.MonitoringService;
 import com.javaee.docmanager.common.model.Result;
+import com.javaee.docmanager.security.UserContext;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -17,16 +20,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
 
 /**
- * 系统监控控制器
+ * 系统监控控制器 — 基于 Redis 的实时指标 + MySQL 归档
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/ai/aiops")
 @Tag(name = "系统监控", description = "RAG/PPT用量统计与AI分析")
-@RequiredArgsConstructor
 public class AIOpsController {
 
+    private static final Logger log = LoggerFactory.getLogger(AIOpsController.class);
+
     private final MonitoringService monitoringService;
+    private final MetricsDailyMapper metricsDailyMapper;
+
+    public AIOpsController(MonitoringService monitoringService, MetricsDailyMapper metricsDailyMapper) {
+        this.monitoringService = monitoringService;
+        this.metricsDailyMapper = metricsDailyMapper;
+    }
 
     @Value("${ai.anthropic.api-key:}")
     private String apiKey;
@@ -40,30 +49,48 @@ public class AIOpsController {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @GetMapping("/monitor")
-    @Operation(summary = "获取监控指标")
+    @Operation(summary = "获取当前用户监控指标")
     public Result<Map<String, Object>> getMetrics() {
-        Map<String, Object> stats = new LinkedHashMap<>();
+        Map<String, Object> metrics = monitoringService.getAllMetrics();
+        return Result.success(metrics);
+    }
 
-        // RAG 统计
-        stats.put("ragSliceCount", monitoringService.getCounter("rag.slices"));
-        stats.put("ragDocCount", monitoringService.getCounter("rag.docs"));
-        stats.put("ragTokensInput", monitoringService.getCounter("rag.tokens.input"));
-        stats.put("ragTokensOutput", monitoringService.getCounter("rag.tokens.output"));
+    @GetMapping("/monitor/global")
+    @Operation(summary = "获取全局聚合指标")
+    public Result<Map<String, Object>> getGlobalMetrics() {
+        Map<String, Object> metrics = monitoringService.getGlobalMetrics();
+        return Result.success(metrics);
+    }
 
-        // PPT 统计
-        stats.put("pptCount", monitoringService.getCounter("ppt.generated"));
-        stats.put("pptTokensInput", monitoringService.getCounter("ppt.tokens.input"));
-        stats.put("pptTokensOutput", monitoringService.getCounter("ppt.tokens.output"));
+    @GetMapping("/monitor/anomaly")
+    @Operation(summary = "异常检测", description = "检测当前用户1小时内请求是否异常")
+    public Result<Map<String, Object>> checkAnomaly() {
+        Long userId = UserContext.getCurrentUserId();
+        boolean isAnomaly = monitoringService.checkAnomaly(userId);
+        long requestCount = monitoringService.getRequestCountLastHour(userId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("anomaly", isAnomaly);
+        result.put("requestCountLastHour", requestCount);
+        result.put("threshold", 100);
+        return Result.success(result);
+    }
 
-        // 总 token
-        long totalInput = monitoringService.getCounter("rag.tokens.input")
-                + monitoringService.getCounter("ppt.tokens.input");
-        long totalOutput = monitoringService.getCounter("rag.tokens.output")
-                + monitoringService.getCounter("ppt.tokens.output");
-        stats.put("totalTokensInput", totalInput);
-        stats.put("totalTokensOutput", totalOutput);
+    @GetMapping("/monitor/daily")
+    @Operation(summary = "获取每日趋势数据", description = "返回最近30天的每日指标快照")
+    public Result<List<MetricsDaily>> getDailyTrends() {
+        Long userId = UserContext.getCurrentUserId();
+        List<MetricsDaily> data = metricsDailyMapper.selectByUserId(userId);
+        return Result.success(data);
+    }
 
-        return Result.success(stats);
+    @GetMapping("/monitor/daily/range")
+    @Operation(summary = "按日期范围查询趋势")
+    public Result<List<MetricsDaily>> getDailyTrendsByRange(
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+        Long userId = UserContext.getCurrentUserId();
+        List<MetricsDaily> data = metricsDailyMapper.selectByUserIdAndDateRange(userId, startDate, endDate);
+        return Result.success(data);
     }
 
     @PostMapping("/reset")
@@ -76,14 +103,28 @@ public class AIOpsController {
     @GetMapping("/analyze")
     @Operation(summary = "AI智能分析", description = "用AI分析当前系统使用情况并给出建议")
     public Result<Map<String, String>> analyze() {
-        // 收集指标
-        long ragSlices = monitoringService.getCounter("rag.slices");
-        long ragDocs = monitoringService.getCounter("rag.docs");
-        long ragIn = monitoringService.getCounter("rag.tokens.input");
-        long ragOut = monitoringService.getCounter("rag.tokens.output");
-        long pptCount = monitoringService.getCounter("ppt.generated");
-        long pptIn = monitoringService.getCounter("ppt.tokens.input");
-        long pptOut = monitoringService.getCounter("ppt.tokens.output");
+        Long userId = UserContext.getCurrentUserId();
+
+        long ragSlices = monitoringService.getCounterForUser(userId, "rag.slices");
+        long ragDocs = monitoringService.getCounterForUser(userId, "rag.docs");
+        long ragIn = monitoringService.getCounterForUser(userId, "rag.tokens.input");
+        long ragOut = monitoringService.getCounterForUser(userId, "rag.tokens.output");
+        long pptCount = monitoringService.getCounterForUser(userId, "ppt.generated");
+        long pptIn = monitoringService.getCounterForUser(userId, "ppt.tokens.input");
+        long pptOut = monitoringService.getCounterForUser(userId, "ppt.tokens.output");
+        long reqLastHour = monitoringService.getRequestCountLastHour(userId);
+
+        // 获取最近7天趋势
+        List<MetricsDaily> recent = metricsDailyMapper.selectByUserId(userId);
+        StringBuilder trendSb = new StringBuilder();
+        if (!recent.isEmpty()) {
+            trendSb.append("\n\n【近7天趋势】\n");
+            for (int i = 0; i < Math.min(7, recent.size()); i++) {
+                MetricsDaily d = recent.get(i);
+                trendSb.append(String.format("- %s: RAG tokens in=%d out=%d, PPT数=%d\n",
+                        d.getDate(), d.getRagTokensInput(), d.getRagTokensOutput(), d.getPptCount()));
+            }
+        }
 
         String prompt = "你是系统运维分析师。以下是DocAI系统的使用数据，请用中文给出简洁的分析和建议（200字以内）：\n\n"
                 + "【RAG知识库】\n"
@@ -95,7 +136,10 @@ public class AIOpsController {
                 + "- 已生成PPT数：" + pptCount + "\n"
                 + "- 消耗input tokens：" + pptIn + "\n"
                 + "- 消耗output tokens：" + pptOut + "\n\n"
-                + "请分析：1) 使用模式 2) 成本分布 3) 优化建议";
+                + "【实时状态】\n"
+                + "- 最近1小时请求数：" + reqLastHour + "\n"
+                + trendSb
+                + "\n请分析：1) 使用模式 2) 成本分布 3) 优化建议";
 
         try {
             String analysis = callLlmSimple(prompt, 1000);

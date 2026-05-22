@@ -144,6 +144,29 @@ public class RedisUtils {
     }
 
     /**
+     * Hash原子递增
+     * @param key 键
+     * @param hashKey Hash键
+     * @param delta 递增值
+     * @return 递增后的值
+     */
+    public Long hIncrement(String key, String hashKey, long delta) {
+        return redisTemplate.opsForHash().increment(key, hashKey, delta);
+    }
+
+    /**
+     * 设置键值并指定过期时间（SETNX）
+     * @param key 键
+     * @param value 值
+     * @param timeout 过期时间
+     * @param unit 时间单位
+     * @return 是否设置成功
+     */
+    public Boolean setIfAbsent(String key, Object value, long timeout, TimeUnit unit) {
+        return redisTemplate.opsForValue().setIfAbsent(key, value, timeout, unit);
+    }
+
+    /**
      * List左侧添加
      * @param key 键
      * @param value 值
@@ -284,6 +307,28 @@ public class RedisUtils {
      */
     public Set<Object> zRangeByScore(String key, double min, double max) {
         return redisTemplate.opsForZSet().rangeByScore(key, min, max);
+    }
+
+    /**
+     * ZSet按分数范围删除
+     * @param key 键
+     * @param min 最小分数
+     * @param max 最大分数
+     * @return 删除的数量
+     */
+    public Long zRemoveRangeByScore(String key, double min, double max) {
+        return redisTemplate.opsForZSet().removeRangeByScore(key, min, max);
+    }
+
+    /**
+     * ZSet按分数范围计数
+     * @param key 键
+     * @param min 最小分数
+     * @param max 最大分数
+     * @return 数量
+     */
+    public Long zCount(String key, double min, double max) {
+        return redisTemplate.opsForZSet().count(key, min, max);
     }
 
     /**

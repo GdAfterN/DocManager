@@ -37,6 +37,19 @@
         UPDATE user SET ${field} = ${field} + #{delta}, update_time = NOW() WHERE id = #{id}
     </update>
 
+    <update id="batchUpdateCounters">
+        UPDATE user SET
+            rag_tokens_input = #{ragTokensInput},
+            rag_tokens_output = #{ragTokensOutput},
+            ppt_tokens_input = #{pptTokensInput},
+            ppt_tokens_output = #{pptTokensOutput},
+            rag_doc_count = #{ragDocCount},
+            rag_slice_count = #{ragSliceCount},
+            ppt_count = #{pptCount},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
     <update id="resetCounters">
         UPDATE user SET rag_tokens_input = 0, rag_tokens_output = 0,
             ppt_tokens_input = 0, ppt_tokens_output = 0,
