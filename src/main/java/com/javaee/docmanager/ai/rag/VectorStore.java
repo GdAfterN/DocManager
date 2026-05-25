@@ -19,7 +19,7 @@ import java.util.*;
 public class VectorStore {
 
     private static final Logger log = LoggerFactory.getLogger(VectorStore.class);
-    private static final String COLLECTION = "documents";
+    private static final String COLLECTION = "documents_v2";
     private static final int VECTOR_SIZE = 1024;
 
     @Autowired

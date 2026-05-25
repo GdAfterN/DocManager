@@ -207,7 +207,7 @@ public class KnowledgeBase {
             for (Map<String, Object> r : vectorResults) {
                 String chunkId = (String) r.get("id");
                 float vecScore = ((Number) r.get("similarity")).floatValue();
-                scoreMap.put(chunkId, vecScore * 0.6f);
+                scoreMap.put(chunkId, vecScore * 0.8f);
                 resultMap.put(chunkId, r);
             }
 
@@ -217,9 +217,9 @@ public class KnowledgeBase {
                 float kwScore = ((Number) r.get("similarity")).floatValue();
                 Float existing = scoreMap.get(chunkId);
                 if (existing != null) {
-                    scoreMap.put(chunkId, existing + kwScore * 0.4f);
+                    scoreMap.put(chunkId, existing + kwScore * 0.2f);
                 } else {
-                    scoreMap.put(chunkId, kwScore * 0.4f);
+                    scoreMap.put(chunkId, kwScore * 0.2f);
                     resultMap.put(chunkId, r);
                 }
             }
@@ -305,48 +305,28 @@ public class KnowledgeBase {
         return results.subList(0, Math.min(topK, results.size()));
     }
 
+    private static final com.huaban.analysis.jieba.JiebaSegmenter JIEBA = new com.huaban.analysis.jieba.JiebaSegmenter();
+
     /**
-     * 从查询中提取关键词：英文分词 + 中文 bigram + 完整查询
+     * 从查询中提取关键词：jieba 中文分词 + 英文分词 + 完整查询
      */
     private Set<String> extractKeywords(String query) {
         Set<String> keywords = new HashSet<>();
         String lower = query.toLowerCase();
 
-        // 英文分词
-        for (String part : lower.split("[\\s\\p{Punct}]+")) {
-            if (part.length() >= 2) {
-                keywords.add(part);
+        // jieba 分词
+        List<com.huaban.analysis.jieba.SegToken> tokens = JIEBA.process(lower, com.huaban.analysis.jieba.JiebaSegmenter.SegMode.SEARCH);
+        for (com.huaban.analysis.jieba.SegToken token : tokens) {
+            String word = token.word.trim();
+            if (word.length() >= 2) {
+                keywords.add(word);
             }
         }
-
-        // 中文 bigram：提取连续的中文字符，每两个相邻字符组成一个 bigram
-        StringBuilder chineseChars = new StringBuilder();
-        for (int i = 0; i < lower.length(); i++) {
-            char c = lower.charAt(i);
-            if (Character.UnicodeBlock.of(c) == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS) {
-                chineseChars.append(c);
-            } else {
-                // 遇到非中文字符，对已积累的中文做 bigram
-                addBigrams(chineseChars.toString(), keywords);
-                chineseChars.setLength(0);
-            }
-        }
-        addBigrams(chineseChars.toString(), keywords);
 
         // 完整查询（去空格）作为整体匹配
         keywords.add(query.toLowerCase().replaceAll("\\s+", ""));
 
         return keywords;
-    }
-
-    private void addBigrams(String chinese, Set<String> keywords) {
-        for (int i = 0; i < chinese.length() - 1; i++) {
-            keywords.add(chinese.substring(i, i + 2));
-        }
-        // 单字也加入（处理只有一个中文关键词的情况）
-        if (chinese.length() == 1) {
-            keywords.add(chinese);
-        }
     }
 
     private String extractDocId(String chunkId) {

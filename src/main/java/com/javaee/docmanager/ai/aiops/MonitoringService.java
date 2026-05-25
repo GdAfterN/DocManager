@@ -60,8 +60,7 @@ public class MonitoringService {
     public void incrementCounter(String name, long delta) {
         Long userId = UserContext.getCurrentUserId();
         if (userId == null) {
-            log.warn("无法记录指标，用户未登录: name={}", name);
-            return;
+            userId = 0L; // MCP等无用户上下文的请求，记到全局用户0
         }
         String field = FIELD_MAP.get(name);
         if (field == null) {
@@ -161,6 +160,10 @@ public class MonitoringService {
             metrics.put("ragDocCount", toLong(raw.getOrDefault("ragDocCount", 0L)));
             metrics.put("ragSliceCount", toLong(raw.getOrDefault("ragSliceCount", 0L)));
             metrics.put("pptCount", toLong(raw.getOrDefault("pptCount", 0L)));
+            long totalInput = toLong(raw.getOrDefault("ragTokensInput", 0L)) + toLong(raw.getOrDefault("pptTokensInput", 0L));
+            long totalOutput = toLong(raw.getOrDefault("ragTokensOutput", 0L)) + toLong(raw.getOrDefault("pptTokensOutput", 0L));
+            metrics.put("totalTokensInput", totalInput);
+            metrics.put("totalTokensOutput", totalOutput);
             metrics.put("requestCountLastHour", getRequestCountLastHour(userId));
             return metrics;
         }
@@ -240,6 +243,10 @@ public class MonitoringService {
         metrics.put("ragSliceCount", zeroIfNull(user.getRagSliceCount()));
         metrics.put("pptCount", zeroIfNull(user.getPptCount()));
         metrics.put("requestCountLastHour", getRequestCountLastHour(userId));
+        long totalInput = zeroIfNull(user.getRagTokensInput()) + zeroIfNull(user.getPptTokensInput());
+        long totalOutput = zeroIfNull(user.getRagTokensOutput()) + zeroIfNull(user.getPptTokensOutput());
+        metrics.put("totalTokensInput", totalInput);
+        metrics.put("totalTokensOutput", totalOutput);
 
         // 回填 Redis
         String key = METRICS_PREFIX + userId;

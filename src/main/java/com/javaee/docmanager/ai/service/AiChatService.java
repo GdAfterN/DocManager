@@ -470,7 +470,7 @@ public class AiChatService {
 
     public String chat(String message) {
         log.info("AI对话: message length={}", message.length());
-        return chatService.callChatApi(message, "ppt.tokens");
+        return chatService.callChatApiWithTools(message);
     }
 
     /**

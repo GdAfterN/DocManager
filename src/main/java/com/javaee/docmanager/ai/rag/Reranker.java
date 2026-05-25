@@ -81,7 +81,7 @@ public class Reranker {
                     float bm25Score = computeBM25(query, content);
                     float ceScore = computeCrossEncoder(query, content);
                     rerankScore = (bm25Score + ceScore) / 2;
-                    finalScore = fuseScores(originalScore, rerankScore, 0.5f, 0.5f);
+                    finalScore = fuseScores(originalScore, rerankScore, 0.6f, 0.4f);
                     break;
             }
 
