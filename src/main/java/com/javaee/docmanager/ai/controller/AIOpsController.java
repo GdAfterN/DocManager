@@ -1,5 +1,7 @@
 package com.javaee.docmanager.ai.controller;
 
+import com.javaee.docmanager.ai.aiops.ErrorLog;
+import com.javaee.docmanager.ai.aiops.ErrorLogMapper;
 import com.javaee.docmanager.ai.aiops.MetricsDaily;
 import com.javaee.docmanager.ai.aiops.MetricsDailyMapper;
 import com.javaee.docmanager.ai.aiops.MonitoringService;
@@ -31,10 +33,12 @@ public class AIOpsController {
 
     private final MonitoringService monitoringService;
     private final MetricsDailyMapper metricsDailyMapper;
+    private final ErrorLogMapper errorLogMapper;
 
-    public AIOpsController(MonitoringService monitoringService, MetricsDailyMapper metricsDailyMapper) {
+    public AIOpsController(MonitoringService monitoringService, MetricsDailyMapper metricsDailyMapper, ErrorLogMapper errorLogMapper) {
         this.monitoringService = monitoringService;
         this.metricsDailyMapper = metricsDailyMapper;
+        this.errorLogMapper = errorLogMapper;
     }
 
     @Value("${ai.anthropic.api-key:}")
@@ -98,6 +102,13 @@ public class AIOpsController {
     public Result<Void> resetMetrics() {
         monitoringService.resetMetrics();
         return Result.success();
+    }
+
+    @GetMapping("/alerts")
+    @Operation(summary = "获取后台报警记录", description = "返回最近50条错误日志及AI分析结果")
+    public Result<List<ErrorLog>> getAlerts() {
+        List<ErrorLog> alerts = errorLogMapper.selectLatest(50);
+        return Result.success(alerts);
     }
 
     @GetMapping("/analyze")

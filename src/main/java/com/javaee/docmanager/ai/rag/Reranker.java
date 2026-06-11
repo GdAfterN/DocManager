@@ -2,26 +2,31 @@ package com.javaee.docmanager.ai.rag;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 /**
  * 重排序器
- * 支持多种重排序策略：BM25融合、Cross-Encoder、自定义规则等
+ * 支持多种重排序策略：BM25融合、Cross-Encoder、DashScope qwen3-rerank 模型
  */
 @Component
 public class Reranker {
 
     private static final Logger log = LoggerFactory.getLogger(Reranker.class);
 
+    @Autowired
+    private DashScopeReranker dashScopeReranker;
+
     /**
      * 重排序策略枚举
      */
     public enum RerankStrategy {
-        BM25_FUSION,      // BM25与向量相似度融合
-        CROSS_ENCODER,    // Cross-Encoder重排序
-        HYBRID            // 混合策略
+        BM25_FUSION,      // BM25与向量相似度融合（本地模拟）
+        CROSS_ENCODER,    // Cross-Encoder重排序（本地模拟）
+        HYBRID,           // 混合策略（本地模拟）
+        DASHSCOPE_RERANK  // DashScope qwen3-rerank 真实模型
     }
 
     /**
@@ -54,10 +59,16 @@ public class Reranker {
      * @param topK 返回数量
      * @return 重排序后的结果
      */
-    public List<Map<String, Object>> rerank(String query, List<Map<String, Object>> candidates, 
+    public List<Map<String, Object>> rerank(String query, List<Map<String, Object>> candidates,
                                             RerankStrategy strategy, int topK) {
         log.info("开始重排序: strategy={}, candidates={}", strategy, candidates.size());
 
+        // DashScope Rerank：直接调用真实模型
+        if (strategy == RerankStrategy.DASHSCOPE_RERANK) {
+            return dashScopeRerank(query, candidates, topK);
+        }
+
+        // 本地模拟策略
         List<RerankResult> rerankResults = new ArrayList<>();
 
         for (Map<String, Object> candidate : candidates) {
@@ -94,11 +105,11 @@ public class Reranker {
         // 构建返回结果
         List<Map<String, Object>> results = new ArrayList<>();
         int limit = Math.min(topK, rerankResults.size());
-        
+
         for (int i = 0; i < limit; i++) {
             RerankResult result = rerankResults.get(i);
             Map<String, Object> candidate = findCandidateById(candidates, result.getDocumentId());
-            
+
             Map<String, Object> finalResult = new HashMap<>(candidate);
             finalResult.put("originalScore", result.getOriginalScore());
             finalResult.put("rerankScore", result.getRerankScore());
@@ -107,6 +118,54 @@ public class Reranker {
         }
 
         log.info("重排序完成，返回{}条结果", results.size());
+        return results;
+    }
+
+    /**
+     * 使用 DashScope qwen3-rerank 模型重排序
+     */
+    private List<Map<String, Object>> dashScopeRerank(String query, List<Map<String, Object>> candidates, int topK) {
+        // 提取文档内容
+        List<String> documents = new ArrayList<>();
+        for (Map<String, Object> c : candidates) {
+            String content = (String) c.get("content");
+            documents.add(content != null ? content : "");
+        }
+
+        // 调用 DashScope Rerank API
+        List<Float> rerankScores = dashScopeReranker.rerank(query, documents, topK);
+
+        // 将 rerank 分数合并到候选结果
+        List<RerankResult> rerankResults = new ArrayList<>();
+        for (int i = 0; i < candidates.size(); i++) {
+            Map<String, Object> candidate = candidates.get(i);
+            String docId = (String) candidate.get("id");
+            float originalScore = ((Number) candidate.get("similarity")).floatValue();
+            float rerankScore = i < rerankScores.size() ? rerankScores.get(i) : 0.0f;
+            // Rerank 分数直接作为最终分数（交叉编码器分数比向量分数更准确）
+            rerankResults.add(new RerankResult(docId, originalScore, rerankScore, rerankScore));
+        }
+
+        // 按 Rerank 分数排序
+        rerankResults.sort((a, b) -> Float.compare(b.getFinalScore(), a.getFinalScore()));
+
+        // 构建返回结果
+        List<Map<String, Object>> results = new ArrayList<>();
+        int limit = Math.min(topK, rerankResults.size());
+
+        for (int i = 0; i < limit; i++) {
+            RerankResult result = rerankResults.get(i);
+            Map<String, Object> candidate = findCandidateById(candidates, result.getDocumentId());
+            if (candidate == null) continue;
+
+            Map<String, Object> finalResult = new HashMap<>(candidate);
+            finalResult.put("originalScore", result.getOriginalScore());
+            finalResult.put("rerankScore", result.getRerankScore());
+            finalResult.put("finalScore", result.getFinalScore());
+            results.add(finalResult);
+        }
+
+        log.info("DashScope Rerank 完成，返回{}条结果", results.size());
         return results;
     }
 
@@ -128,10 +187,10 @@ public class Reranker {
 
         float score = 0.0f;
         int totalDocs = 1000; // 假设总文档数
-        
+
         for (String term : queryTerms) {
             if (term.isEmpty()) continue;
-            
+
             int termFreq = 0;
             for (String docTerm : docTerms) {
                 if (docTerm.contains(term) || term.contains(docTerm)) {
@@ -153,27 +212,24 @@ public class Reranker {
 
     /**
      * 计算Cross-Encoder分数（模拟实现）
-     * 实际应调用专门的Cross-Encoder模型
      */
     private float computeCrossEncoder(String query, String document) {
         if (query == null || document == null) {
             return 0.0f;
         }
 
-        // 简单模拟：基于关键词匹配和语义重叠
         String queryLower = query.toLowerCase();
         String docLower = document.toLowerCase();
 
         int matchCount = 0;
         String[] queryTerms = queryLower.split("\\s+");
-        
+
         for (String term : queryTerms) {
             if (docLower.contains(term)) {
                 matchCount++;
             }
         }
 
-        // 计算位置权重（关键词出现在文档开头权重更高）
         float positionBonus = 0.0f;
         for (String term : queryTerms) {
             int idx = docLower.indexOf(term);
@@ -186,21 +242,10 @@ public class Reranker {
         return Math.min(1.0f, baseScore + positionBonus);
     }
 
-    /**
-     * 融合两个分数
-     * @param score1 分数1
-     * @param score2 分数2
-     * @param weight1 分数1权重
-     * @param weight2 分数2权重
-     * @return 融合后的分数
-     */
     private float fuseScores(float score1, float score2, float weight1, float weight2) {
         return score1 * weight1 + score2 * weight2;
     }
 
-    /**
-     * 根据ID查找候选结果
-     */
     private Map<String, Object> findCandidateById(List<Map<String, Object>> candidates, String id) {
         return candidates.stream()
             .filter(c -> id.equals(c.get("id")))
@@ -208,9 +253,6 @@ public class Reranker {
             .orElse(null);
     }
 
-    /**
-     * 获取所有支持的重排序策略
-     */
     public List<String> getSupportedStrategies() {
         List<String> strategies = new ArrayList<>();
         for (RerankStrategy strategy : RerankStrategy.values()) {

@@ -234,6 +234,22 @@ public class VectorStore {
         }
     }
 
+    /**
+     * 删除整个集合（用于清空所有向量数据）
+     */
+    public void deleteCollection() {
+        try {
+            qdrantRestClient.delete()
+                    .uri("/collections/" + COLLECTION)
+                    .retrieve()
+                    .toBodilessEntity();
+            collectionReady = false;
+            log.info("Qdrant 集合 '{}' 已删除", COLLECTION);
+        } catch (Exception e) {
+            log.warn("删除 Qdrant 集合失败（可能不存在）: {}", e.getMessage());
+        }
+    }
+
     private String escapeJson(String s) {
         return s.replace("\\", "\\\\")
                 .replace("\"", "\\\"")

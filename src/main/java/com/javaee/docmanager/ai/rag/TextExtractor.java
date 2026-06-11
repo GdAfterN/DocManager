@@ -1,105 +1,74 @@
 package com.javaee.docmanager.ai.rag;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.text.PDFTextStripper;
-import org.apache.poi.xslf.usermodel.XMLSlideShow;
-import org.apache.poi.xslf.usermodel.XSLFShape;
-import org.apache.poi.xslf.usermodel.XSLFSlide;
-import org.apache.poi.xslf.usermodel.XSLFTextShape;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.tika.Tika;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.List;
 
 @Slf4j
 @Component
 public class TextExtractor {
+
+    private final Tika tika = new Tika();
 
     public String extract(String fileType, byte[] data) {
         return extract(fileType, null, data);
     }
 
     public String extract(String fileType, String fileName, byte[] data) {
-        if (fileType == null && fileName == null) return "";
-        String type = fileType != null ? fileType.toLowerCase() : "";
+        if (data == null || data.length == 0) return "";
+
+        String text;
+        try {
+            // Tika 自动检测文件类型并提取文本
+            text = tika.parseToString(new ByteArrayInputStream(data));
+        } catch (Exception e) {
+            log.error("Tika文本提取失败: fileType={}, fileName={}", fileType, fileName, e);
+            return "";
+        }
+
+        if (text == null || text.isBlank()) {
+            log.warn("文档内容为空: fileType={}, fileName={}", fileType, fileName);
+            return "";
+        }
+
+        // PDF 段落合并后处理（Tika 提取的 PDF 文本也有换行问题）
         String name = fileName != null ? fileName.toLowerCase() : "";
+        String type = fileType != null ? fileType.toLowerCase() : "";
         if (type.contains("pdf") || name.endsWith(".pdf")) {
-            return extractPdf(data);
-        } else if (type.contains("word") || type.contains("msword") || name.endsWith(".docx") || name.endsWith(".doc")) {
-            return extractWord(data);
-        } else if (type.contains("powerpoint") || type.contains("presentation") || name.endsWith(".pptx") || name.endsWith(".ppt")) {
-            return extractPpt(data);
-        } else if (type.contains("csv") || name.endsWith(".csv")) {
-            return extractCsv(data);
-        } else if (type.contains("markdown") || type.contains("plain") || name.endsWith(".md")) {
-            return new String(data);
+            text = mergeParagraphs(text);
         }
-        // 兜底：纯文本类型按文本处理
-        if (type.startsWith("text/") || type.contains("octet-stream") && (name.endsWith(".md") || name.endsWith(".txt"))) {
-            return new String(data);
-        }
-        log.warn("不支持的文件类型用于文本提取: fileType={}, fileName={}", fileType, fileName);
-        return "";
-    }
 
-    public String extractPdf(byte[] data) {
-        try (PDDocument doc = Loader.loadPDF(data)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String text = stripper.getText(doc);
-            log.debug("PDF文本提取成功, length={}", text.length());
-            return text;
-        } catch (IOException e) {
-            log.error("PDF文本提取失败", e);
-            return "";
-        }
-    }
-
-    public String extractWord(byte[] data) {
-        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(data))) {
-            StringBuilder sb = new StringBuilder();
-            for (XWPFParagraph para : doc.getParagraphs()) {
-                String text = para.getText();
-                if (text != null && !text.isBlank()) {
-                    sb.append(text).append("\n");
-                }
-            }
-            log.debug("Word文本提取成功, length={}", sb.length());
-            return sb.toString();
-        } catch (IOException e) {
-            log.error("Word文本提取失败", e);
-            return "";
-        }
-    }
-
-    public String extractPpt(byte[] data) {
-        try (XMLSlideShow ppt = new XMLSlideShow(new ByteArrayInputStream(data))) {
-            StringBuilder sb = new StringBuilder();
-            for (XSLFSlide slide : ppt.getSlides()) {
-                for (XSLFShape shape : slide.getShapes()) {
-                    if (shape instanceof XSLFTextShape textShape) {
-                        String text = textShape.getText();
-                        if (text != null && !text.isBlank()) {
-                            sb.append(text).append("\n");
-                        }
-                    }
-                }
-            }
-            log.debug("PPT文本提取成功, length={}", sb.length());
-            return sb.toString();
-        } catch (IOException e) {
-            log.error("PPT文本提取失败", e);
-            return "";
-        }
-    }
-
-    public String extractCsv(byte[] data) {
-        String text = new String(data);
-        log.debug("CSV文本提取成功, length={}", text.length());
+        log.debug("文本提取成功: fileType={}, fileName={}, length={}", fileType, fileName, text.length());
         return text;
+    }
+
+    /**
+     * PDF段落合并：连续非空行用空格连接（同段落），空行保留为段落分隔
+     */
+    private String mergeParagraphs(String raw) {
+        String[] lines = raw.split("\n");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            if (line.isEmpty()) {
+                if (sb.length() > 0 && !sb.toString().endsWith("\n\n")) {
+                    sb.append("\n\n");
+                }
+            } else {
+                sb.append(line).append("\n");
+            }
+        }
+        String intermediate = sb.toString();
+        StringBuilder result = new StringBuilder();
+        String[] paragraphs = intermediate.split("\n\n+");
+        for (int i = 0; i < paragraphs.length; i++) {
+            String para = paragraphs[i].trim();
+            if (para.isEmpty()) continue;
+            String merged = para.replace("\n", " ");
+            result.append(merged).append("\n\n");
+        }
+        return result.toString();
     }
 }
